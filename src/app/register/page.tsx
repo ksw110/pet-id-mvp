@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import QRCode from 'qrcode';
+import { supabase } from '@/lib/supabase';
 
 export default function RegisterPage() {
   const [form, setForm] = useState({
@@ -9,39 +10,76 @@ export default function RegisterPage() {
     owner_name: '',
     phone: '',
     emergency_note: '',
+    location: '',
   });
 
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [qrImage, setQrImage] = useState('');
   const [resultUrl, setResultUrl] = useState('');
+  const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setLoading(true);
+    setQrImage('');
+    setResultUrl('');
 
-    const res = await fetch('/api/pets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    });
+    try {
+      let imageUrl = '';
 
-    const data = await res.json();
+      if (imageFile) {
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random()
+          .toString(36)
+          .substring(2, 8)}.${fileExt}`;
 
-    if (!res.ok) {
-      alert(data.error || '등록 실패');
-      return;
+        const { error: uploadError } = await supabase.storage
+          .from('pet-images')
+          .upload(fileName, imageFile);
+
+        if (uploadError) {
+          alert(uploadError.message);
+          return;
+        }
+
+        const { data: publicUrlData } = supabase.storage
+          .from('pet-images')
+          .getPublicUrl(fileName);
+
+        imageUrl = publicUrlData.publicUrl;
+      }
+
+      const res = await fetch('/api/pets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...form,
+          image_url: imageUrl,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || '등록 실패');
+        return;
+      }
+
+      const qr = await QRCode.toDataURL(data.url, {
+        width: 800,
+        margin: 2,
+        errorCorrectionLevel: 'H',
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF',
+        },
+      });
+
+      setResultUrl(data.url);
+      setQrImage(qr);
+    } finally {
+      setLoading(false);
     }
-
-    const qr = await QRCode.toDataURL(data.url, {
-      width: 800,
-      margin: 2,
-      errorCorrectionLevel: 'H',
-      color: {
-        dark: '#000000',
-        light: '#FFFFFF',
-      },
-    });
-
-    setResultUrl(data.url);
-    setQrImage(qr);
   }
 
   return (
@@ -54,27 +92,30 @@ export default function RegisterPage() {
             placeholder="강아지 이름"
             className="w-full rounded border p-3"
             value={form.pet_name}
-            onChange={(e) =>
-              setForm({ ...form, pet_name: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, pet_name: e.target.value })}
+            required
           />
 
           <input
             placeholder="보호자 이름"
             className="w-full rounded border p-3"
             value={form.owner_name}
-            onChange={(e) =>
-              setForm({ ...form, owner_name: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, owner_name: e.target.value })}
           />
 
           <input
             placeholder="연락처"
             className="w-full rounded border p-3"
             value={form.phone}
-            onChange={(e) =>
-              setForm({ ...form, phone: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            required
+          />
+
+          <input
+            placeholder="활동지역 예: 광주 북구 첨단동"
+            className="w-full rounded border p-3"
+            value={form.location}
+            onChange={(e) => setForm({ ...form, location: e.target.value })}
           />
 
           <textarea
@@ -86,8 +127,22 @@ export default function RegisterPage() {
             }
           />
 
-          <button className="w-full rounded bg-black p-3 text-white">
-            등록하기
+          <input
+            type="file"
+            accept="image/*"
+            className="w-full rounded border p-3"
+            onChange={(e) => {
+              if (e.target.files?.[0]) {
+                setImageFile(e.target.files[0]);
+              }
+            }}
+          />
+
+          <button
+            disabled={loading}
+            className="w-full rounded bg-black p-3 text-white disabled:opacity-50"
+          >
+            {loading ? '등록 중...' : '등록하기'}
           </button>
         </form>
 
