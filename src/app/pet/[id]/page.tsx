@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import Image from 'next/image';
 import { notFound } from 'next/navigation';
 
 type Props = {
@@ -17,51 +18,95 @@ export default async function Page({ params }: Props) {
   if (error || !data) return notFound();
 
   return (
-    <main className="min-h-screen bg-gray-50 px-6 py-12">
-      <div className="mx-auto max-w-md rounded-2xl border bg-white p-6 shadow-sm">
-        {data.image_url && (
-          <img
-            src={data.image_url}
-            alt={data.pet_name}
-            className="mb-5 h-72 w-full rounded-xl object-cover"
-          />
-        )}
-
-        <div className="text-center">
-          <p className="text-sm text-gray-500">반려견 보호 정보</p>
-
-          <h1 className="mt-2 text-3xl font-bold">{data.pet_name}</h1>
-
-          {data.owner_name && (
-            <p className="mt-2 text-gray-600">보호자: {data.owner_name}</p>
+    <main className="min-h-screen bg-[#fbfaf7] px-4 py-5 text-[#171717] sm:px-6 sm:py-10">
+      <section className="mx-auto grid w-full max-w-6xl overflow-hidden rounded-[28px] border border-[#e9e4dc] bg-white p-4 shadow-[0_24px_70px_rgba(55,45,30,0.12)] md:grid-cols-[1fr_0.95fr] md:gap-8 md:p-8">
+        <div className="relative h-[540px] max-h-[68vh] min-h-[460px] overflow-hidden rounded-2xl bg-[#f6f0e8] md:h-auto md:max-h-none md:min-h-[560px]">
+          {data.image_url ? (
+            <>
+              <Image
+                src={data.image_url}
+                alt=""
+                fill
+                unoptimized
+                aria-hidden="true"
+                sizes="(max-width: 768px) 100vw, 50vw"
+                className="scale-110 object-cover opacity-35 blur-xl"
+              />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,250,240,0.42))]" />
+              <Image
+                src={data.image_url}
+                alt={`${data.pet_name} 사진`}
+                fill
+                unoptimized
+                priority
+                sizes="(max-width: 768px) 100vw, 50vw"
+                className="object-cover object-[center_28%] drop-shadow-[0_18px_32px_rgba(37,29,18,0.22)]"
+              />
+            </>
+          ) : (
+            <div className="grid h-full w-full place-items-center bg-[#fff2c7]">
+              <span className="text-[132px] leading-none">🐶</span>
+            </div>
           )}
+        </div>
 
-          {data.location && (
-            <p className="mt-1 text-gray-600">
-              활동지역: {data.location}
+        <div className="flex flex-col py-6 md:py-4">
+          <div className="mb-7 inline-flex w-fit items-center gap-2 rounded-full bg-[#eaf7ed] px-4 py-2 text-sm font-black text-[#2f9d46]">
+            <span className="grid h-6 w-6 place-items-center rounded-full bg-white">♧</span>
+            이 아이는 보호받고 있어요
+          </div>
+
+          <h1 className="mb-8 text-4xl font-black tracking-normal md:text-5xl">
+            {data.pet_name} <span className="text-[#b98242]">🐾</span>
+          </h1>
+
+          <dl className="space-y-5 text-[15px]">
+            {data.owner_name && (
+              <div className="grid grid-cols-[28px_88px_1fr] items-start gap-2">
+                <dt className="text-xl leading-none">♙</dt>
+                <dt className="font-bold text-[#6f6657]">보호자</dt>
+                <dd className="font-semibold">{data.owner_name}</dd>
+              </div>
+            )}
+
+            <div className="grid grid-cols-[28px_88px_1fr] items-start gap-2">
+              <dt className="text-xl leading-none">☎</dt>
+              <dt className="font-bold text-[#6f6657]">연락처</dt>
+              <dd className="font-black text-[#28a745]">{data.phone}</dd>
+            </div>
+
+            {data.location && (
+              <div className="grid grid-cols-[28px_88px_1fr] items-start gap-2">
+                <dt className="text-xl leading-none">⌖</dt>
+                <dt className="font-bold text-[#6f6657]">활동 지역</dt>
+                <dd className="font-semibold leading-6">{data.location}</dd>
+              </div>
+            )}
+
+            <div className="grid grid-cols-[28px_88px_1fr] items-start gap-2">
+              <dt className="text-xl leading-none">◇</dt>
+              <dt className="font-bold text-[#6f6657]">특이사항</dt>
+              <dd className="font-semibold leading-7">
+                {data.emergency_note || '특이사항 없음'}
+              </dd>
+            </div>
+          </dl>
+
+          <div className="mt-10 rounded-2xl bg-[#edf8ee] p-5 text-sm text-[#244a2b]">
+            <p className="mb-2 font-black">이 아이를 발견하셨다면?</p>
+            <p className="leading-6">
+              위 연락처로 연락 주시면 감사하겠습니다. 우리 아이가 무사히 집으로 돌아갈 수 있도록 도와주세요.
             </p>
-          )}
-        </div>
+          </div>
 
-        <a
-          href={`tel:${data.phone}`}
-          className="mt-6 block rounded-xl bg-black p-3 text-center text-white"
-        >
-          보호자에게 전화하기
-        </a>
-
-        <div className="mt-5 rounded-xl bg-gray-50 p-4">
-          <p className="text-sm font-semibold text-gray-700">연락처</p>
-          <p className="mt-2 text-sm text-gray-600">{data.phone}</p>
+          <a
+            href={`tel:${data.phone}`}
+            className="mt-7 flex h-14 w-full items-center justify-center rounded-xl bg-[#35ad49] px-5 text-center text-base font-black text-white shadow-[0_12px_28px_rgba(53,173,73,0.28)] transition hover:bg-[#2d9c3f]"
+          >
+            ☎ 보호자에게 전화하기
+          </a>
         </div>
-
-        <div className="mt-4 rounded-xl bg-gray-50 p-4">
-          <p className="text-sm font-semibold text-gray-700">특이사항</p>
-          <p className="mt-2 text-sm text-gray-600">
-            {data.emergency_note || '등록된 특이사항이 없습니다.'}
-          </p>
-        </div>
-      </div>
+      </section>
     </main>
   );
 }
