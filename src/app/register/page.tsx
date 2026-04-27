@@ -5,11 +5,83 @@ import Image from 'next/image';
 import QRCode from 'qrcode';
 import { supabase } from '@/lib/supabase';
 
+const MAX_IMAGE_SIZE = 1200;
+const IMAGE_QUALITY = 0.82;
+
+function createUploadFileName(file: File) {
+  const extension = file.type === 'image/png' ? 'png' : 'jpg';
+  const safeBaseName = file.name
+    .replace(/\.[^.]+$/, '')
+    .replace(/[^a-zA-Z0-9_-]/g, '-')
+    .replace(/-+/g, '-')
+    .slice(0, 40) || 'pet-photo';
+
+  return `${Date.now()}-${safeBaseName}.${extension}`;
+}
+
+async function compressImage(file: File) {
+  const imageUrl = URL.createObjectURL(file);
+  const image = document.createElement('img');
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error('이미지를 불러오지 못했습니다.'));
+      image.src = imageUrl;
+    });
+
+    const scale = Math.min(1, MAX_IMAGE_SIZE / Math.max(image.naturalWidth, image.naturalHeight));
+    const width = Math.round(image.naturalWidth * scale);
+    const height = Math.round(image.naturalHeight * scale);
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+
+    if (!context) {
+      return file;
+    }
+
+    canvas.width = width;
+    canvas.height = height;
+    context.drawImage(image, 0, 0, width, height);
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, 'image/jpeg', IMAGE_QUALITY);
+    });
+
+    if (!blob || blob.size >= file.size) {
+      return file;
+    }
+
+    const fileName = file.name.replace(/\.[^.]+$/, '') || 'pet-photo';
+    return new File([blob], `${fileName}.jpg`, {
+      type: 'image/jpeg',
+      lastModified: Date.now(),
+    });
+  } finally {
+    URL.revokeObjectURL(imageUrl);
+  }
+}
+
+function dataUrlToBlob(dataUrl: string) {
+  const [metadata, base64] = dataUrl.split(',');
+  const mimeType = metadata.match(/:(.*?);/)?.[1] || 'image/png';
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return new Blob([bytes], { type: mimeType });
+}
+
 export default function RegisterPage() {
   const [form, setForm] = useState({
     pet_name: '',
     owner_name: '',
     phone: '',
+    emergency_phone: '',
+    animal_registration_number: '',
     emergency_note: '',
     location: '',
   });
@@ -18,6 +90,7 @@ export default function RegisterPage() {
   const [qrImage, setQrImage] = useState('');
   const [resultUrl, setResultUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  const [compressing, setCompressing] = useState(false);
   const selectedFileName = imageFile?.name ?? '';
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -29,14 +102,15 @@ export default function RegisterPage() {
 
       // 📸 이미지 업로드
       if (imageFile) {
-        const fileName = `${Date.now()}-${imageFile.name}`;
+        const fileName = createUploadFileName(imageFile);
 
         const { error } = await supabase.storage
           .from('pet-images')
           .upload(fileName, imageFile);
 
         if (error) {
-          alert('이미지 업로드 실패');
+          console.error('Image upload failed:', error);
+          alert(`이미지 업로드 실패: ${error.message}`);
           return;
         }
 
@@ -69,6 +143,21 @@ export default function RegisterPage() {
         width: 800,
         errorCorrectionLevel: 'H',
       });
+
+      const qrBlob = dataUrlToBlob(qr);
+
+      const { error: qrUploadError } = await supabase.storage
+        .from('pet-images')
+        .upload(data.qr_file_name, qrBlob, {
+          contentType: 'image/png',
+          upsert: true,
+        });
+
+      if (qrUploadError) {
+        console.error('QR upload failed:', qrUploadError);
+        alert(`QR 이미지 저장 실패: ${qrUploadError.message}`);
+        return;
+      }
 
       setQrImage(qr);
       setResultUrl(data.url);
@@ -148,7 +237,7 @@ export default function RegisterPage() {
             <label className="block">
               <span className="mb-2 block text-sm font-bold">보호자 이름 <span className="text-[#ee6958]">*</span></span>
               <input
-                placeholder="예) 김시우"
+                placeholder="예) 홍길동"
                 className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm outline-none transition placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
                 value={form.owner_name}
                 onChange={(e) =>
@@ -168,6 +257,30 @@ export default function RegisterPage() {
                   setForm({ ...form, phone: e.target.value })
                 }
                 required
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-bold">비상연락망 <span className="font-medium text-[#8b8378]">(선택)</span></span>
+              <input
+                placeholder="예) 010-9876-5432"
+                className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm outline-none transition placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
+                value={form.emergency_phone}
+                onChange={(e) =>
+                  setForm({ ...form, emergency_phone: e.target.value })
+                }
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-bold">동물등록번호 <span className="font-medium text-[#8b8378]">(선택)</span></span>
+              <input
+                placeholder="예) 410000000000000"
+                className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm outline-none transition placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
+                value={form.animal_registration_number}
+                onChange={(e) =>
+                  setForm({ ...form, animal_registration_number: e.target.value })
+                }
               />
             </label>
 
@@ -200,16 +313,32 @@ export default function RegisterPage() {
               <span className="mb-2 block text-sm font-bold">사진 등록 <span className="text-[#ee6958]">*</span></span>
               <span className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-[#d9d2c7] bg-[#fffdf8] px-4 py-5 text-center transition hover:border-[#f2bd33] hover:bg-[#fff8e5]">
                 <span className="mb-2 grid h-10 w-10 place-items-center rounded-full bg-white text-xl shadow-sm">📷</span>
-                <span className="text-sm font-bold">{selectedFileName || '사진 선택하기'}</span>
-                <span className="mt-1 text-xs text-[#8b8378]">최대 5MB, JPG/PNG 권장</span>
+                <span className="text-sm font-bold">
+                  {compressing ? '사진 최적화 중...' : selectedFileName || '사진 선택하기'}
+                </span>
+                <span className="mt-1 text-xs text-[#8b8378]">자동 압축 후 업로드됩니다</span>
               </span>
               <input
                 type="file"
                 accept="image/*"
                 className="sr-only"
-                onChange={(e) => {
-                  if (e.target.files?.[0]) {
-                    setImageFile(e.target.files[0]);
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+
+                  if (!file) {
+                    return;
+                  }
+
+                  setCompressing(true);
+
+                  try {
+                    setImageFile(await compressImage(file));
+                  } catch {
+                    alert('사진 최적화에 실패했어요. 다른 사진으로 다시 시도해주세요.');
+                    e.target.value = '';
+                    setImageFile(null);
+                  } finally {
+                    setCompressing(false);
                   }
                 }}
                 required
@@ -217,7 +346,7 @@ export default function RegisterPage() {
             </label>
 
             <button
-              disabled={loading}
+              disabled={loading || compressing}
               className="mt-3 h-13 w-full rounded-xl bg-[#ffd766] px-5 text-sm font-black text-[#211a0c] shadow-[0_10px_24px_rgba(229,173,36,0.28)] transition hover:bg-[#ffcc3d] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? '생성 중...' : 'QR 코드 생성하기  🐾'}

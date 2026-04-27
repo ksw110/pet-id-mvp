@@ -10,6 +10,8 @@ export async function POST(req: Request) {
       pet_name,
       owner_name,
       phone,
+      emergency_phone,
+      animal_registration_number,
       emergency_note,
       image_url,
       location,
@@ -23,14 +25,21 @@ export async function POST(req: Request) {
     }
 
     const id = nanoid(8);
+    const qrFileName = `qr_code/${id}.png`;
+    const { data: qrPublicUrlData } = supabase.storage
+      .from('pet-images')
+      .getPublicUrl(qrFileName);
 
     const { error } = await supabase.from('pets').insert({
       id,
       pet_name,
       owner_name,
       phone,
+      emergency_phone,
+      animal_registration_number,
       emergency_note,
       image_url,
+      qr_image_url: qrPublicUrlData.publicUrl,
       location,
     });
 
@@ -46,7 +55,12 @@ export async function POST(req: Request) {
 
     const url = `${baseUrl}/pet/${id}`;
 
-    return NextResponse.json({ id, url });
+    return NextResponse.json({
+      id,
+      url,
+      qr_image_url: qrPublicUrlData.publicUrl,
+      qr_file_name: qrFileName,
+    });
   } catch {
     return NextResponse.json(
       { error: '서버 오류' },

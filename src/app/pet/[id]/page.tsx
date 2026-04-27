@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
+import LocationShareButton from './LocationShareButton';
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -75,6 +76,22 @@ export default async function Page({ params }: Props) {
               <dd className="font-black text-[#28a745]">{data.phone}</dd>
             </div>
 
+            {data.emergency_phone && (
+              <div className="grid grid-cols-[28px_88px_1fr] items-start gap-2">
+                <dt className="text-xl leading-none">☏</dt>
+                <dt className="font-bold text-[#6f6657]">비상연락망</dt>
+                <dd className="font-black text-[#28a745]">{data.emergency_phone}</dd>
+              </div>
+            )}
+
+            {data.animal_registration_number && (
+              <div className="grid grid-cols-[28px_88px_1fr] items-start gap-2">
+                <dt className="text-xl leading-none">▣</dt>
+                <dt className="font-bold text-[#6f6657]">등록번호</dt>
+                <dd className="font-semibold leading-6">{data.animal_registration_number}</dd>
+              </div>
+            )}
+
             {data.location && (
               <div className="grid grid-cols-[28px_88px_1fr] items-start gap-2">
                 <dt className="text-xl leading-none">⌖</dt>
@@ -105,6 +122,8 @@ export default async function Page({ params }: Props) {
           >
             ☎ 보호자에게 전화하기
           </a>
+
+          <LocationShareButton petName={data.pet_name} phone={data.phone} />
         </div>
       </section>
     </main>
