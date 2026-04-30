@@ -10,10 +10,12 @@ export async function POST(req: Request) {
       pet_name,
       owner_name,
       phone,
+      id: requestedId,
       emergency_phone,
       animal_registration_number,
       emergency_note,
       image_url,
+      qr_image_url,
       location,
     } = body;
 
@@ -24,11 +26,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const id = nanoid(8);
-    const qrFileName = `qr_code/${id}.png`;
-    const { data: qrPublicUrlData } = supabase.storage
-      .from('pet-images')
-      .getPublicUrl(qrFileName);
+    const id = requestedId || nanoid(8);
 
     const { error } = await supabase.from('pets').insert({
       id,
@@ -39,7 +37,7 @@ export async function POST(req: Request) {
       animal_registration_number,
       emergency_note,
       image_url,
-      qr_image_url: qrPublicUrlData.publicUrl,
+      qr_image_url,
       location,
     });
 
@@ -58,8 +56,6 @@ export async function POST(req: Request) {
     return NextResponse.json({
       id,
       url,
-      qr_image_url: qrPublicUrlData.publicUrl,
-      qr_file_name: qrFileName,
     });
   } catch {
     return NextResponse.json(

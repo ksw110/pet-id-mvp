@@ -10,6 +10,20 @@ type PetQr = {
   qr_image_url: string | null;
 };
 
+function formatPhoneNumber(value: string) {
+  const numbers = value.replace(/\D/g, '').slice(0, 11);
+
+  if (numbers.length <= 3) {
+    return numbers;
+  }
+
+  if (numbers.length <= 7) {
+    return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+  }
+
+  return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7)}`;
+}
+
 export default function QrCodeLookupPage() {
   const [phone, setPhone] = useState('');
   const [pets, setPets] = useState<PetQr[]>([]);
@@ -85,7 +99,7 @@ export default function QrCodeLookupPage() {
               placeholder="예) 010-1234-5678"
               className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm outline-none transition placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => setPhone(formatPhoneNumber(e.target.value))}
               required
             />
           </label>

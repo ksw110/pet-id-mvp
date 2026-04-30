@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import QRCode from 'qrcode';
+import { nanoid } from 'nanoid';
 import { supabase } from '@/lib/supabase';
 
 const MAX_IMAGE_SIZE = 1200;
@@ -75,6 +76,20 @@ function dataUrlToBlob(dataUrl: string) {
   return new Blob([bytes], { type: mimeType });
 }
 
+function formatPhoneNumber(value: string) {
+  const numbers = value.replace(/\D/g, '').slice(0, 11);
+
+  if (numbers.length <= 3) {
+    return numbers;
+  }
+
+  if (numbers.length <= 7) {
+    return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+  }
+
+  return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7)}`;
+}
+
 export default function RegisterPage() {
   const [form, setForm] = useState({
     pet_name: '',
@@ -121,13 +136,46 @@ export default function RegisterPage() {
         imageUrl = data.publicUrl;
       }
 
+      const petId = nanoid(8);
+      const resultPetUrl = `${window.location.origin}/pet/${petId}`;
+
+      // 🔥 QR 생성
+      const qr = await QRCode.toDataURL(resultPetUrl, {
+        width: 800,
+        errorCorrectionLevel: 'H',
+      });
+
+      const qrFileName = `qr_code/${petId}.png`;
+      const qrFile = new File([dataUrlToBlob(qr)], `${petId}.png`, {
+        type: 'image/png',
+        lastModified: Date.now(),
+      });
+
+      const { error: qrUploadError } = await supabase.storage
+        .from('pet-images')
+        .upload(qrFileName, qrFile, {
+          contentType: 'image/png',
+        });
+
+      if (qrUploadError) {
+        console.error('QR upload failed:', qrUploadError);
+        alert(`QR 이미지 저장 실패: ${qrUploadError.message}`);
+        return;
+      }
+
+      const { data: qrPublicUrlData } = supabase.storage
+        .from('pet-images')
+        .getPublicUrl(qrFileName);
+
       // 📡 API 호출
       const res = await fetch('/api/pets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
+          id: petId,
           image_url: imageUrl,
+          qr_image_url: qrPublicUrlData.publicUrl,
         }),
       });
 
@@ -138,29 +186,8 @@ export default function RegisterPage() {
         return;
       }
 
-      // 🔥 QR 생성
-      const qr = await QRCode.toDataURL(data.url, {
-        width: 800,
-        errorCorrectionLevel: 'H',
-      });
-
-      const qrBlob = dataUrlToBlob(qr);
-
-      const { error: qrUploadError } = await supabase.storage
-        .from('pet-images')
-        .upload(data.qr_file_name, qrBlob, {
-          contentType: 'image/png',
-          upsert: true,
-        });
-
-      if (qrUploadError) {
-        console.error('QR upload failed:', qrUploadError);
-        alert(`QR 이미지 저장 실패: ${qrUploadError.message}`);
-        return;
-      }
-
       setQrImage(qr);
-      setResultUrl(data.url);
+      setResultUrl(data.url || resultPetUrl);
 
     } finally {
       setLoading(false);
@@ -254,7 +281,7 @@ export default function RegisterPage() {
                 className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm outline-none transition placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
                 value={form.phone}
                 onChange={(e) =>
-                  setForm({ ...form, phone: e.target.value })
+                  setForm({ ...form, phone: formatPhoneNumber(e.target.value) })
                 }
                 required
               />
@@ -267,7 +294,7 @@ export default function RegisterPage() {
                 className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm outline-none transition placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
                 value={form.emergency_phone}
                 onChange={(e) =>
-                  setForm({ ...form, emergency_phone: e.target.value })
+                  setForm({ ...form, emergency_phone: formatPhoneNumber(e.target.value) })
                 }
               />
             </label>
