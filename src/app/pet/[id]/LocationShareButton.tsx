@@ -10,6 +10,21 @@ type LocationShareButtonProps = {
 export default function LocationShareButton({ petName, phone }: LocationShareButtonProps) {
   const [loading, setLoading] = useState(false);
 
+  async function getAddress(latitude: number, longitude: number) {
+    try {
+      const res = await fetch(`/api/location/address?lat=${latitude}&lng=${longitude}`);
+
+      if (!res.ok) {
+        return '';
+      }
+
+      const data = await res.json();
+      return typeof data.address === 'string' ? data.address : '';
+    } catch {
+      return '';
+    }
+  }
+
   function handleShareLocation() {
     if (!navigator.geolocation) {
       alert('현재 브라우저에서는 위치 공유를 지원하지 않아요.');
@@ -17,7 +32,7 @@ export default function LocationShareButton({ petName, phone }: LocationShareBut
     }
 
     const allowed = window.confirm(
-      '현재 위치를 보호자에게 문자로 보내기 위해 브라우저 위치 권한을 요청합니다. 계속할까요?'
+      '현재 위치를 주소로 변환하고 보호자에게 문자로 보내기 위해 위치 권한을 요청합니다. 좌표는 주소 변환을 위해 카카오 API로 전송될 수 있어요. 계속할까요?'
     );
 
     if (!allowed) {
@@ -27,10 +42,14 @@ export default function LocationShareButton({ petName, phone }: LocationShareBut
     setLoading(true);
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
         const { latitude, longitude } = position.coords;
-        const mapUrl = `https://maps.google.com/?q=${latitude},${longitude}`;
-        const message = `${petName}를 발견했어요. 현재 위치: ${mapUrl}`;
+        const address = await getAddress(latitude, longitude);
+        const mapUrl = address
+          ? `https://m.map.kakao.com/scheme/search?q=${encodeURIComponent(address)}`
+          : `https://m.map.kakao.com/scheme/look?p=${latitude},${longitude}`;
+        const locationText = address ? `현재 위치: ${address}\n` : '';
+        const message = `${petName}를 발견했어요.\n${locationText}카카오맵에서 위치를 확인해주세요: ${mapUrl}`;
 
         window.location.href = `sms:${phone}?body=${encodeURIComponent(message)}`;
         setLoading(false);
