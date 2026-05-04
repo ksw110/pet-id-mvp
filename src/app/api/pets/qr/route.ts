@@ -4,6 +4,15 @@ import { supabase } from '@/lib/supabase';
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const phone = searchParams.get('phone')?.trim();
+  const password = searchParams.get('password') || '';
+  const adminPassword = process.env.QR_ADMIN_PASSWORD;
+
+  if (!adminPassword || password !== adminPassword) {
+    return NextResponse.json(
+      { error: '관리자 비밀번호가 올바르지 않습니다.' },
+      { status: 401 }
+    );
+  }
 
   if (!phone) {
     return NextResponse.json(

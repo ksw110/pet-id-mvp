@@ -25,6 +25,8 @@ function formatPhoneNumber(value: string) {
 }
 
 export default function QrCodeLookupPage() {
+  const [adminPassword, setAdminPassword] = useState('');
+  const [adminUnlocked, setAdminUnlocked] = useState(false);
   const [phone, setPhone] = useState('');
   const [pets, setPets] = useState<PetQr[]>([]);
   const [loading, setLoading] = useState(false);
@@ -55,7 +57,11 @@ export default function QrCodeLookupPage() {
     setPets([]);
 
     try {
-      const res = await fetch(`/api/pets/qr?phone=${encodeURIComponent(phone.trim())}`);
+      const searchParams = new URLSearchParams({
+        phone: phone.trim(),
+        password: adminPassword,
+      });
+      const res = await fetch(`/api/pets/qr?${searchParams.toString()}`);
       const data = await res.json();
 
       if (!res.ok) {
@@ -67,6 +73,40 @@ export default function QrCodeLookupPage() {
       setSearched(true);
     } catch {
       setError('QR 조회 중 오류가 발생했어요.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleUnlock(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setPets([]);
+    setSearched(false);
+
+    if (!adminPassword.trim()) {
+      setError('관리자 비밀번호를 입력해주세요.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/pets/qr/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: adminPassword }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || '관리자 인증에 실패했어요.');
+        return;
+      }
+
+      setAdminUnlocked(true);
+    } catch {
+      setError('관리자 인증 중 오류가 발생했어요.');
     } finally {
       setLoading(false);
     }
@@ -92,25 +132,48 @@ export default function QrCodeLookupPage() {
           </p>
         </header>
 
-        <form onSubmit={handleSearch} className="space-y-4">
-          <label className="block">
-            <span className="mb-2 block text-sm font-bold">보호자 연락처</span>
-            <input
-              placeholder="예) 010-1234-5678"
-              className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm outline-none transition placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
-              value={phone}
-              onChange={(e) => setPhone(formatPhoneNumber(e.target.value))}
-              required
-            />
-          </label>
+        {!adminUnlocked ? (
+          <form onSubmit={handleUnlock} className="space-y-4">
+            <label className="block">
+              <span className="mb-2 block text-sm font-bold">관리자 비밀번호</span>
+              <input
+                type="password"
+                placeholder="관리자 비밀번호 입력"
+                className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm outline-none transition placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                required
+              />
+            </label>
 
-          <button
-            disabled={loading}
-            className="h-13 w-full rounded-xl bg-[#ffd766] px-5 text-sm font-black text-[#211a0c] shadow-[0_10px_24px_rgba(229,173,36,0.28)] transition hover:bg-[#ffcc3d] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {loading ? '조회 중...' : 'QR 코드 조회하기'}
-          </button>
-        </form>
+            <button
+              disabled={loading}
+              className="h-13 w-full rounded-xl bg-[#171717] px-5 text-sm font-black text-white shadow-[0_10px_24px_rgba(0,0,0,0.16)] transition hover:bg-[#2b2b2b] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? '확인 중...' : '관리자 모드 열기'}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleSearch} className="space-y-4">
+            <label className="block">
+              <span className="mb-2 block text-sm font-bold">보호자 연락처</span>
+              <input
+                placeholder="예) 010-1234-5678"
+                className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm outline-none transition placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
+                value={phone}
+                onChange={(e) => setPhone(formatPhoneNumber(e.target.value))}
+                required
+              />
+            </label>
+
+            <button
+              disabled={loading}
+              className="h-13 w-full rounded-xl bg-[#ffd766] px-5 text-sm font-black text-[#211a0c] shadow-[0_10px_24px_rgba(229,173,36,0.28)] transition hover:bg-[#ffcc3d] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? '조회 중...' : 'QR 코드 조회하기'}
+            </button>
+          </form>
+        )}
 
         {error && (
           <p className="mt-5 rounded-xl bg-[#fff0ee] px-4 py-3 text-sm font-bold text-[#c34838]">

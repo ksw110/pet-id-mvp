@@ -2,23 +2,10 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import QRCode from 'qrcode';
-import { nanoid } from 'nanoid';
-import { supabase } from '@/lib/supabase';
+import PrivacyPolicyContent from '../privacy/PrivacyPolicyContent';
 
 const MAX_IMAGE_SIZE = 1200;
 const IMAGE_QUALITY = 0.82;
-
-function createUploadFileName(file: File) {
-  const extension = file.type === 'image/png' ? 'png' : 'jpg';
-  const safeBaseName = file.name
-    .replace(/\.[^.]+$/, '')
-    .replace(/[^a-zA-Z0-9_-]/g, '-')
-    .replace(/-+/g, '-')
-    .slice(0, 40) || 'pet-photo';
-
-  return `${Date.now()}-${safeBaseName}.${extension}`;
-}
 
 async function compressImage(file: File) {
   const imageUrl = URL.createObjectURL(file);
@@ -63,19 +50,6 @@ async function compressImage(file: File) {
   }
 }
 
-function dataUrlToBlob(dataUrl: string) {
-  const [metadata, base64] = dataUrl.split(',');
-  const mimeType = metadata.match(/:(.*?);/)?.[1] || 'image/png';
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-
-  return new Blob([bytes], { type: mimeType });
-}
-
 function formatPhoneNumber(value: string) {
   const numbers = value.replace(/\D/g, '').slice(0, 11);
 
@@ -92,6 +66,8 @@ function formatPhoneNumber(value: string) {
 
 export default function RegisterPage() {
   const [form, setForm] = useState({
+    registration_code: '',
+    password: '',
     pet_name: '',
     owner_name: '',
     phone: '',
@@ -106,6 +82,8 @@ export default function RegisterPage() {
   const [resultUrl, setResultUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [compressing, setCompressing] = useState(false);
+  const [privacyAgreed, setPrivacyAgreed] = useState(false);
+  const [privacyModalOpen, setPrivacyModalOpen] = useState(false);
   const selectedFileName = imageFile?.name ?? '';
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -113,70 +91,47 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      let imageUrl = '';
+      const registrationCode = form.registration_code.trim().toUpperCase();
 
-      // 📸 이미지 업로드
-      if (imageFile) {
-        const fileName = createUploadFileName(imageFile);
-
-        const { error } = await supabase.storage
-          .from('pet-images')
-          .upload(fileName, imageFile);
-
-        if (error) {
-          console.error('Image upload failed:', error);
-          alert(`이미지 업로드 실패: ${error.message}`);
-          return;
-        }
-
-        const { data } = supabase.storage
-          .from('pet-images')
-          .getPublicUrl(fileName);
-
-        imageUrl = data.publicUrl;
-      }
-
-      const petId = nanoid(8);
-      const resultPetUrl = `${window.location.origin}/pet/${petId}`;
-
-      // 🔥 QR 생성
-      const qr = await QRCode.toDataURL(resultPetUrl, {
-        width: 800,
-        errorCorrectionLevel: 'H',
-      });
-
-      const qrFileName = `qr_code/${petId}.png`;
-      const qrFile = new File([dataUrlToBlob(qr)], `${petId}.png`, {
-        type: 'image/png',
-        lastModified: Date.now(),
-      });
-
-      const { error: qrUploadError } = await supabase.storage
-        .from('pet-images')
-        .upload(qrFileName, qrFile, {
-          contentType: 'image/png',
-        });
-
-      if (qrUploadError) {
-        console.error('QR upload failed:', qrUploadError);
-        alert(`QR 이미지 저장 실패: ${qrUploadError.message}`);
+      if (!registrationCode || !form.password) {
+        alert('등록코드와 비밀번호를 입력해주세요.');
         return;
       }
 
-      const { data: qrPublicUrlData } = supabase.storage
-        .from('pet-images')
-        .getPublicUrl(qrFileName);
+      if (form.password.length < 6) {
+        alert('비밀번호는 6자 이상 입력해주세요.');
+        return;
+      }
+
+      const codeValidationRes = await fetch('/api/registration-codes/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ registration_code: registrationCode }),
+      });
+      const codeValidationData = await codeValidationRes.json();
+
+      if (!codeValidationRes.ok) {
+        alert(codeValidationData.error || '등록코드를 확인할 수 없습니다.');
+        return;
+      }
+
+      const formData = new FormData();
+
+      Object.entries({
+        ...form,
+        registration_code: registrationCode,
+      }).forEach(([key, value]) => {
+        formData.append(key, value);
+      });
+
+      if (imageFile) {
+        formData.append('image_file', imageFile);
+      }
 
       // 📡 API 호출
       const res = await fetch('/api/pets', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...form,
-          id: petId,
-          image_url: imageUrl,
-          qr_image_url: qrPublicUrlData.publicUrl,
-        }),
+        body: formData,
       });
 
       const data = await res.json();
@@ -186,8 +141,8 @@ export default function RegisterPage() {
         return;
       }
 
-      setQrImage(qr);
-      setResultUrl(data.url || resultPetUrl);
+      setQrImage(data.qr_image_url || '');
+      setResultUrl(data.url);
 
     } finally {
       setLoading(false);
@@ -248,6 +203,43 @@ export default function RegisterPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="rounded-2xl border border-[#eee8dc] bg-[#fffdf8] p-4">
+              <p className="mb-4 text-sm font-black text-[#d69b14]">등록 인증</p>
+
+              <div className="space-y-4">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-bold">등록코드 <span className="text-[#ee6958]">*</span></span>
+                  <input
+                    placeholder="예) PET-ABCD1234"
+                    className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm uppercase outline-none transition placeholder:normal-case placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
+                    value={form.registration_code}
+                    onChange={(e) =>
+                      setForm({ ...form, registration_code: e.target.value.toUpperCase() })
+                    }
+                    required
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-bold">비밀번호 <span className="text-[#ee6958]">*</span></span>
+                  <input
+                    type="password"
+                    placeholder="추후 정보 수정 시 사용할 비밀번호"
+                    className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm outline-none transition placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
+                    value={form.password}
+                    onChange={(e) =>
+                      setForm({ ...form, password: e.target.value })
+                    }
+                    minLength={6}
+                    required
+                  />
+                  <span className="mt-2 block text-xs leading-5 text-[#8b8378]">
+                    등록코드와 비밀번호는 추후 정보 수정에 사용됩니다.
+                  </span>
+                </label>
+              </div>
+            </div>
+
             <label className="block">
               <span className="mb-2 block text-sm font-bold">반려견 이름 <span className="text-[#ee6958]">*</span></span>
               <input
@@ -312,7 +304,7 @@ export default function RegisterPage() {
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-sm font-bold">활동 지역 <span className="text-[#ee6958]">*</span></span>
+              <span className="mb-2 block text-sm font-bold">활동 지역 <span className="font-medium text-[#8b8378]">(선택)</span></span>
               <input
                 placeholder="예) 서울 강남구, 압구정동"
                 className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm outline-none transition placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
@@ -320,7 +312,6 @@ export default function RegisterPage() {
                 onChange={(e) =>
                   setForm({ ...form, location: e.target.value })
                 }
-                required
               />
             </label>
 
@@ -372,8 +363,37 @@ export default function RegisterPage() {
               />
             </label>
 
+            <div className="rounded-2xl border border-[#eee8dc] bg-[#fffdf8] p-4">
+              <div className="flex items-start justify-between gap-3">
+                <label className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={privacyAgreed}
+                    onChange={(e) => setPrivacyAgreed(e.target.checked)}
+                    required
+                    className="mt-1 h-5 w-5 rounded border-[#d9d2c7] accent-[#35ad49]"
+                  />
+                  <span className="text-sm font-black leading-6">
+                    [필수] 개인정보 수집·이용에 동의합니다.
+                  </span>
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => setPrivacyModalOpen(true)}
+                  className="shrink-0 text-xs font-black text-[#2f9d46] underline underline-offset-4"
+                >
+                  자세히 보기
+                </button>
+              </div>
+
+              <p className="mt-3 text-xs leading-6 text-[#5f574c]">
+                QR코드를 스캔할 경우 등록된 반려견 정보와 보호자 연락처가 제3자에게 공개될 수 있습니다.
+              </p>
+            </div>
+
             <button
-              disabled={loading || compressing}
+              disabled={loading || compressing || !privacyAgreed}
               className="mt-3 h-13 w-full rounded-xl bg-[#ffd766] px-5 text-sm font-black text-[#211a0c] shadow-[0_10px_24px_rgba(229,173,36,0.28)] transition hover:bg-[#ffcc3d] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? '생성 중...' : 'QR 코드 생성하기  🐾'}
@@ -405,6 +425,35 @@ export default function RegisterPage() {
           )}
         </div>
       </section>
+
+      {privacyModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="privacy-modal-title"
+          className="fixed inset-0 z-50 flex items-end bg-black/45 px-3 py-4 sm:items-center sm:px-6"
+        >
+          <div className="mx-auto flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-white shadow-[0_24px_70px_rgba(0,0,0,0.28)]">
+            <header className="flex items-center justify-between border-b border-[#f0ece4] px-5 py-4">
+              <h2 id="privacy-modal-title" className="text-lg font-black">
+                개인정보 처리방침
+              </h2>
+              <button
+                type="button"
+                onClick={() => setPrivacyModalOpen(false)}
+                className="grid h-9 w-9 place-items-center rounded-full bg-[#f7f3ec] text-lg font-black"
+                aria-label="개인정보 처리방침 닫기"
+              >
+                ×
+              </button>
+            </header>
+
+            <div className="overflow-y-auto px-5 py-5">
+              <PrivacyPolicyContent />
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
