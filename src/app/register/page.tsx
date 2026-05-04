@@ -6,6 +6,11 @@ import PrivacyPolicyContent from '../privacy/PrivacyPolicyContent';
 
 const MAX_IMAGE_SIZE = 1200;
 const IMAGE_QUALITY = 0.82;
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+
+function formatFileSize(bytes: number) {
+  return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+}
 
 async function compressImage(file: File) {
   const imageUrl = URL.createObjectURL(file);
@@ -64,6 +69,14 @@ function formatPhoneNumber(value: string) {
   return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7)}`;
 }
 
+async function readJsonResponse(res: Response) {
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 export default function RegisterPage() {
   const [form, setForm] = useState({
     registration_code: '',
@@ -84,11 +97,13 @@ export default function RegisterPage() {
   const [compressing, setCompressing] = useState(false);
   const [privacyAgreed, setPrivacyAgreed] = useState(false);
   const [privacyModalOpen, setPrivacyModalOpen] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState('');
   const selectedFileName = imageFile?.name ?? '';
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
+    setSubmitMessage('');
 
     try {
       const registrationCode = form.registration_code.trim().toUpperCase();
@@ -108,10 +123,12 @@ export default function RegisterPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ registration_code: registrationCode }),
       });
-      const codeValidationData = await codeValidationRes.json();
+      const codeValidationData = await readJsonResponse(codeValidationRes);
 
       if (!codeValidationRes.ok) {
-        alert(codeValidationData.error || '등록코드를 확인할 수 없습니다.');
+        const errorMessage = codeValidationData?.error || '등록코드를 확인할 수 없습니다.';
+        setSubmitMessage(errorMessage);
+        alert(errorMessage);
         return;
       }
 
@@ -134,16 +151,35 @@ export default function RegisterPage() {
         body: formData,
       });
 
-      const data = await res.json();
+      const data = await readJsonResponse(res);
 
       if (!res.ok) {
-        alert(data.error || '등록 실패');
+        const errorMessage = data?.error || '등록 실패';
+        setSubmitMessage(errorMessage);
+        alert(errorMessage);
         return;
+      }
+
+      if (!data?.url) {
+        throw new Error('QR 생성 결과를 불러오지 못했어요.');
       }
 
       setQrImage(data.qr_image_url || '');
       setResultUrl(data.url);
-
+      setSubmitMessage('QR 코드가 생성됐어요.');
+      window.setTimeout(() => {
+        document.getElementById('qr-result')?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
+      }, 100);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : '등록 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.';
+      setSubmitMessage(errorMessage);
+      alert(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -350,7 +386,18 @@ export default function RegisterPage() {
                   setCompressing(true);
 
                   try {
-                    setImageFile(await compressImage(file));
+                    const compressedFile = await compressImage(file);
+
+                    if (compressedFile.size > MAX_UPLOAD_BYTES) {
+                      alert(
+                        `사진 용량이 너무 커요. 현재 ${formatFileSize(compressedFile.size)}라서 4MB 이하 사진으로 다시 선택해주세요.`
+                      );
+                      e.target.value = '';
+                      setImageFile(null);
+                      return;
+                    }
+
+                    setImageFile(compressedFile);
                   } catch {
                     alert('사진 최적화에 실패했어요. 다른 사진으로 다시 시도해주세요.');
                     e.target.value = '';
@@ -400,8 +447,14 @@ export default function RegisterPage() {
             </button>
           </form>
 
+          {submitMessage && (
+            <p className="mt-5 break-keep rounded-xl bg-[#f7f3ec] px-4 py-3 text-sm font-bold text-[#6f6657]">
+              {submitMessage}
+            </p>
+          )}
+
           {resultUrl && (
-            <div className="mt-7 rounded-2xl border border-[#eee8dc] bg-[#fffdf8] p-5 text-center">
+            <div id="qr-result" className="mt-7 rounded-2xl border border-[#eee8dc] bg-[#fffdf8] p-5 text-center">
               <p className="text-xs font-bold text-[#8b8378]">생성된 Pet ID 링크</p>
               <p className="mt-2 break-all text-sm text-[#4f493f]">{resultUrl}</p>
 
