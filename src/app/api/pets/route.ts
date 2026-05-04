@@ -20,6 +20,27 @@ function getUploadFileName(file: File, fallbackName: string) {
   return `${Date.now()}-${safeBaseName}.${extension}`;
 }
 
+function getPetImagePathFromPublicUrl(publicUrl: string) {
+  if (!publicUrl) {
+    return null;
+  }
+
+  const marker = '/storage/v1/object/public/pet-images/';
+  const markerIndex = publicUrl.indexOf(marker);
+
+  if (markerIndex === -1) {
+    return null;
+  }
+
+  const path = publicUrl.slice(markerIndex + marker.length).split('?')[0];
+
+  if (!path.startsWith('pet_photos/')) {
+    return null;
+  }
+
+  return decodeURIComponent(path);
+}
+
 async function uploadFileToStorage(
   file: File,
   path: string,
@@ -43,6 +64,17 @@ async function uploadFileToStorage(
     .getPublicUrl(path);
 
   return data.publicUrl;
+}
+
+async function removeStorageFile(path: string) {
+  const supabaseAdmin = getSupabaseAdmin();
+  const { error } = await supabaseAdmin.storage
+    .from('pet-images')
+    .remove([path]);
+
+  if (error) {
+    console.error('Failed to remove old pet image:', error.message);
+  }
 }
 
 async function uploadBufferToStorage(
@@ -223,8 +255,10 @@ export async function PATCH(req: Request) {
     }
 
     let imageUrl = pet.image_url || '';
+    let oldImagePath: string | null = null;
 
     if (imageFile instanceof File && imageFile.size > 0) {
+      oldImagePath = getPetImagePathFromPublicUrl(pet.image_url || '');
       const imagePath = `pet_photos/${pet.id}-${getUploadFileName(imageFile, 'pet-photo')}`;
       imageUrl = await uploadFileToStorage(
         imageFile,
@@ -254,6 +288,14 @@ export async function PATCH(req: Request) {
         { error: updateError.message },
         { status: 500 }
       );
+    }
+
+    if (oldImagePath) {
+      const newImagePath = getPetImagePathFromPublicUrl(imageUrl);
+
+      if (newImagePath && oldImagePath !== newImagePath) {
+        await removeStorageFile(oldImagePath);
+      }
     }
 
     const baseUrl =
