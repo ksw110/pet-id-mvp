@@ -1,6 +1,47 @@
+'use client';
+
 import Link from 'next/link';
+import { useState } from 'react';
 
 export default function HomePage() {
+  const [lookupCode, setLookupCode] = useState('');
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupMessage, setLookupMessage] = useState('');
+  const [lookupResult, setLookupResult] = useState<{
+    pet_name: string;
+    url: string;
+  } | null>(null);
+
+  async function handleLookup(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setLookupLoading(true);
+    setLookupMessage('');
+    setLookupResult(null);
+
+    try {
+      const res = await fetch('/api/pets/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          registration_code: lookupCode.trim().toUpperCase(),
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setLookupMessage(data.error || 'URL을 찾을 수 없습니다.');
+        return;
+      }
+
+      setLookupResult(data);
+      setLookupMessage('등록된 URL을 찾았어요.');
+    } catch {
+      setLookupMessage('URL 조회 중 오류가 발생했어요.');
+    } finally {
+      setLookupLoading(false);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[#fbfaf7] px-4 py-5 text-[#171717] sm:px-6 sm:py-10">
       <section className="mx-auto grid w-full max-w-6xl overflow-hidden rounded-[28px] border border-[#ece7dd] bg-white shadow-[0_24px_70px_rgba(55,45,30,0.12)] lg:grid-cols-[1.05fr_0.95fr]">
@@ -42,6 +83,52 @@ export default function HomePage() {
                 정보 수정하기
               </Link>
             </div>
+
+            <form
+              onSubmit={handleLookup}
+              className="mt-8 rounded-[24px] border border-[#eee8dc] bg-white/90 p-5 shadow-[0_14px_36px_rgba(55,45,30,0.1)] sm:p-6"
+            >
+              <div className="mb-4">
+                <p className="text-sm font-black text-[#d69b14]">URL 조회</p>
+                <h2 className="mt-2 text-xl font-black">등록번호로 공개 URL 찾기</h2>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <input
+                  placeholder="예) PET-ABCD1234"
+                  className="h-13 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm uppercase outline-none transition placeholder:normal-case placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
+                  value={lookupCode}
+                  onChange={(e) => setLookupCode(e.target.value.toUpperCase())}
+                  required
+                />
+                <button
+                  disabled={lookupLoading}
+                  className="h-13 w-full rounded-xl bg-[#171717] px-5 text-sm font-black text-white shadow-[0_10px_24px_rgba(0,0,0,0.14)] transition hover:bg-[#2b2b2b] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {lookupLoading ? '조회 중...' : '조회하기'}
+                </button>
+              </div>
+
+              {lookupMessage && (
+                <p className="mt-3 text-sm font-bold text-[#6f6657]">
+                  {lookupMessage}
+                </p>
+              )}
+
+              {lookupResult && (
+                <div className="mt-3 rounded-xl bg-[#fffdf8] p-3">
+                  <p className="text-xs font-bold text-[#8b8378]">
+                    {lookupResult.pet_name} 공개 URL
+                  </p>
+                  <a
+                    href={lookupResult.url}
+                    className="mt-1 block break-all text-sm font-black text-[#2f9d46] underline underline-offset-4"
+                  >
+                    {lookupResult.url}
+                  </a>
+                </div>
+              )}
+            </form>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3">
