@@ -46,8 +46,8 @@ export default function LocationShareButton({ petName, phone }: LocationShareBut
         const { latitude, longitude } = position.coords;
         const address = await getAddress(latitude, longitude);
         const mapUrl = address
-          ? `https://m.map.kakao.com/scheme/search?q=${encodeURIComponent(address)}`
-          : `https://m.map.kakao.com/scheme/look?p=${latitude},${longitude}`;
+          ? `https://map.kakao.com/link/map/${encodeURIComponent(address)},${latitude},${longitude}`
+          : `https://map.kakao.com/link/map/${latitude},${longitude}`;
         const locationText = address ? `현재 위치: ${address}\n` : '';
         const message = `${petName}를 발견했어요.\n${locationText}카카오맵에서 위치를 확인해주세요: ${mapUrl}`;
 
