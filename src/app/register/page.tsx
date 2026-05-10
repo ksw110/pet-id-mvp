@@ -520,7 +520,7 @@ export default function RegisterPage() {
               required
               emptyText="사진 선택 후 영역 고르기"
               helperText="선택 후 원하는 영역을 직접 맞춘 뒤 업로드됩니다"
-              hintText="정사각형 기준으로 저장돼요."
+              hintText="모바일 카드에 보이는 세로형 영역 기준으로 저장돼요."
               value={imageFile}
               onChange={setImageFile}
               onProcessingChange={setProcessingImage}

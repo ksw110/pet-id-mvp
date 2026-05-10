@@ -4,8 +4,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-const CROP_VIEWPORT_SIZE = 320;
-const MAX_IMAGE_SIZE = 1200;
+const CROP_VIEWPORT_WIDTH = 320;
+const CROP_VIEWPORT_HEIGHT = 240;
+const OUTPUT_IMAGE_WIDTH = 1200;
+const OUTPUT_IMAGE_HEIGHT = Math.round(
+  OUTPUT_IMAGE_WIDTH * (CROP_VIEWPORT_HEIGHT / CROP_VIEWPORT_WIDTH)
+);
 const IMAGE_QUALITY = 0.82;
 const DEFAULT_MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 
@@ -42,12 +46,12 @@ function getFileBaseName(name: string) {
 }
 
 function getMinimumScale(image: LoadedImage) {
-  return Math.max(CROP_VIEWPORT_SIZE / image.width, CROP_VIEWPORT_SIZE / image.height);
+  return Math.max(CROP_VIEWPORT_WIDTH / image.width, CROP_VIEWPORT_HEIGHT / image.height);
 }
 
 function clampPosition(position: CropPosition, width: number, height: number) {
-  const minX = Math.min(0, CROP_VIEWPORT_SIZE - width);
-  const minY = Math.min(0, CROP_VIEWPORT_SIZE - height);
+  const minX = Math.min(0, CROP_VIEWPORT_WIDTH - width);
+  const minY = Math.min(0, CROP_VIEWPORT_HEIGHT - height);
 
   return {
     x: Math.min(0, Math.max(minX, position.x)),
@@ -58,8 +62,8 @@ function clampPosition(position: CropPosition, width: number, height: number) {
 function centerPosition(width: number, height: number) {
   return clampPosition(
     {
-      x: (CROP_VIEWPORT_SIZE - width) / 2,
-      y: (CROP_VIEWPORT_SIZE - height) / 2,
+      x: (CROP_VIEWPORT_WIDTH - width) / 2,
+      y: (CROP_VIEWPORT_HEIGHT - height) / 2,
     },
     width,
     height
@@ -96,7 +100,8 @@ async function createCroppedImageFile(
 ) {
   const minScale = getMinimumScale(image);
   const scale = minScale * zoom;
-  const cropSourceSize = CROP_VIEWPORT_SIZE / scale;
+  const cropSourceWidth = CROP_VIEWPORT_WIDTH / scale;
+  const cropSourceHeight = CROP_VIEWPORT_HEIGHT / scale;
   const sourceX = Math.max(0, -position.x / scale);
   const sourceY = Math.max(0, -position.y / scale);
   const sourceImage = document.createElement('img');
@@ -114,18 +119,18 @@ async function createCroppedImageFile(
     throw new Error('사진 편집을 준비하지 못했습니다.');
   }
 
-  canvas.width = MAX_IMAGE_SIZE;
-  canvas.height = MAX_IMAGE_SIZE;
+  canvas.width = OUTPUT_IMAGE_WIDTH;
+  canvas.height = OUTPUT_IMAGE_HEIGHT;
   context.drawImage(
     sourceImage,
     sourceX,
     sourceY,
-    cropSourceSize,
-    cropSourceSize,
+    cropSourceWidth,
+    cropSourceHeight,
     0,
     0,
-    MAX_IMAGE_SIZE,
-    MAX_IMAGE_SIZE
+    OUTPUT_IMAGE_WIDTH,
+    OUTPUT_IMAGE_HEIGHT
   );
 
   const blob = await new Promise<Blob | null>((resolve) => {
@@ -209,8 +214,8 @@ function ImageCropDialog({
 
   const minScale = loadedImage ? getMinimumScale(loadedImage) : 1;
   const scale = minScale * zoom;
-  const displayWidth = loadedImage ? loadedImage.width * scale : CROP_VIEWPORT_SIZE;
-  const displayHeight = loadedImage ? loadedImage.height * scale : CROP_VIEWPORT_SIZE;
+  const displayWidth = loadedImage ? loadedImage.width * scale : CROP_VIEWPORT_WIDTH;
+  const displayHeight = loadedImage ? loadedImage.height * scale : CROP_VIEWPORT_HEIGHT;
 
   function updateZoom(nextZoom: number) {
     if (!loadedImage) {
@@ -220,8 +225,8 @@ function ImageCropDialog({
     const safeZoom = Math.min(3, Math.max(1, nextZoom));
     const currentScale = minScale * zoom;
     const nextScale = minScale * safeZoom;
-    const centerSourceX = (CROP_VIEWPORT_SIZE / 2 - position.x) / currentScale;
-    const centerSourceY = (CROP_VIEWPORT_SIZE / 2 - position.y) / currentScale;
+    const centerSourceX = (CROP_VIEWPORT_WIDTH / 2 - position.x) / currentScale;
+    const centerSourceY = (CROP_VIEWPORT_HEIGHT / 2 - position.y) / currentScale;
     const nextWidth = loadedImage.width * nextScale;
     const nextHeight = loadedImage.height * nextScale;
 
@@ -229,8 +234,8 @@ function ImageCropDialog({
     setPosition(
       clampPosition(
         {
-          x: CROP_VIEWPORT_SIZE / 2 - centerSourceX * nextScale,
-          y: CROP_VIEWPORT_SIZE / 2 - centerSourceY * nextScale,
+          x: CROP_VIEWPORT_WIDTH / 2 - centerSourceX * nextScale,
+          y: CROP_VIEWPORT_HEIGHT / 2 - centerSourceY * nextScale,
         },
         nextWidth,
         nextHeight
@@ -317,7 +322,7 @@ function ImageCropDialog({
                 사진 영역 선택
               </h2>
               <p className="mt-1 text-sm text-[#6f6657]">
-                사진을 드래그하고 확대해서 보여주고 싶은 부분을 맞춰주세요.
+                모바일 카드에서 보일 영역에 맞게 사진을 드래그하고 확대해주세요.
               </p>
             </div>
             <button
@@ -335,8 +340,8 @@ function ImageCropDialog({
         <div className="px-5 pb-5 pt-4">
           <div className="grid place-items-center rounded-[24px] bg-[#f6f0e8] px-4 py-5">
             <div
-              className="relative overflow-hidden rounded-full bg-[#e5ded2] touch-none"
-              style={{ width: CROP_VIEWPORT_SIZE, height: CROP_VIEWPORT_SIZE }}
+              className="relative overflow-hidden rounded-[28px] bg-[#e5ded2] touch-none"
+              style={{ width: CROP_VIEWPORT_WIDTH, height: CROP_VIEWPORT_HEIGHT }}
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerEnd}
@@ -360,7 +365,7 @@ function ImageCropDialog({
                   이미지 준비 중...
                 </div>
               )}
-              <div className="pointer-events-none absolute inset-0 rounded-full border-[3px] border-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.28)]" />
+              <div className="pointer-events-none absolute inset-0 rounded-[28px] border-[3px] border-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.28)]" />
             </div>
           </div>
 
@@ -471,7 +476,7 @@ export default function PetPhotoPicker({
 
         {displayPreviewUrl && (
           <div className="mb-3 flex justify-center rounded-2xl border border-[#ece7dd] bg-[#f6f0e8] px-4 py-4">
-            <div className="h-52 w-52 overflow-hidden rounded-full border-4 border-white shadow-[0_12px_32px_rgba(55,45,30,0.12)]">
+            <div className="w-full max-w-[320px] overflow-hidden rounded-[24px] border-4 border-white shadow-[0_12px_32px_rgba(55,45,30,0.12)] aspect-[4/3]">
               <img
                 src={displayPreviewUrl}
                 alt="선택한 반려견 사진 미리보기"

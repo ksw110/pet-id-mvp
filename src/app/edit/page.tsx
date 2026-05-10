@@ -424,7 +424,7 @@ export default function EditPage() {
                 label="사진 변경"
                 emptyText="새 사진 선택 후 영역 고르기"
                 helperText="선택하지 않으면 기존 사진이 유지됩니다"
-                hintText="새로 선택한 사진은 원하는 영역으로 잘라서 저장돼요."
+                hintText="새로 선택한 사진은 모바일 카드에 보이는 영역 기준으로 저장돼요."
                 value={imageFile}
                 existingImageUrl={form.image_url}
                 onChange={setImageFile}
