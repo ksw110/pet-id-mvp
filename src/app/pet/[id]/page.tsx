@@ -74,7 +74,7 @@ export default async function Page({ params }: Props) {
                       unoptimized
                       priority
                       sizes="(max-width: 640px) 220px, (max-width: 768px) 260px, 320px"
-                      className="rounded-full object-cover object-center drop-shadow-[0_18px_32px_rgba(37,29,18,0.22)]"
+                      className="rounded-full object-cover object-center"
                     />
                   </>
                 ) : (
