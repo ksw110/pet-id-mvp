@@ -381,7 +381,7 @@ function ImageCropDialog({
             />
           </div>
 
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-6 flex flex-row gap-3">
             <button
               type="button"
               onClick={onClose}
@@ -396,7 +396,7 @@ function ImageCropDialog({
               disabled={!loadedImage || saving}
               className="min-h-16 flex-1 rounded-2xl bg-[#ffd766] px-5 py-4 text-[17px] font-black text-[#211a0c] shadow-[0_10px_24px_rgba(229,173,36,0.28)] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {saving ? '사진 준비 중...' : '이 영역으로 사용하기'}
+              {saving ? '사진 준비 중...' : '사용하기'}
             </button>
           </div>
         </div>
