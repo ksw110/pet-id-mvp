@@ -49,7 +49,7 @@ export default function HomePage() {
           <header className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-2 font-bold">
               <span className="grid h-8 w-8 place-items-center rounded-full bg-[#fff0ba] text-lg">🐾</span>
-              Pet ID
+              Meong Grey
             </div>
             <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-bold text-[#6f6657] shadow-sm">
               QR 반려견 인식표
@@ -166,7 +166,7 @@ export default function HomePage() {
                 <div className="space-y-3 text-sm">
                   <div className="grid grid-cols-[92px_1fr] gap-3">
                     <span className="font-bold text-[#7b7266]">보호자</span>
-                    <span className="font-black">김시우</span>
+                    <span className="font-black">고길동</span>
                   </div>
                   <div className="grid grid-cols-[92px_1fr] gap-3">
                     <span className="font-bold text-[#7b7266]">연락처</span>

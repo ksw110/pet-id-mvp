@@ -186,7 +186,7 @@ export default function AdminPage() {
         <header className="mb-8 border-b border-[#f0ece4] pb-5">
           <div className="mb-8 flex items-center gap-2 font-bold">
             <span className="grid h-8 w-8 place-items-center rounded-full bg-[#fff0ba] text-lg">🐾</span>
-            Pet ID
+            Meong Grey
           </div>
 
           <p className="mb-3 text-sm font-bold text-[#d69b14]">Admin</p>

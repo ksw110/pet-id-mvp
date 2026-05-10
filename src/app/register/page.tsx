@@ -166,7 +166,7 @@ export default function RegisterPage() {
           <header className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-2 font-bold">
               <span className="grid h-8 w-8 place-items-center rounded-full bg-[#fff0ba] text-lg">🐾</span>
-              Pet ID
+              Meong Grey
             </div>
             <span className="text-xs font-medium text-[#6f6657]">QR로 연결되는 우리 아이의 정보</span>
           </header>
@@ -196,7 +196,7 @@ export default function RegisterPage() {
           <header className="mb-8 flex items-center justify-between border-b border-[#f0ece4] pb-5 lg:hidden">
             <Link href="/" className="flex items-center gap-2 font-bold">
               <span className="grid h-8 w-8 place-items-center rounded-full bg-[#fff0ba] text-lg">🐾</span>
-              Pet ID
+              Meong Grey
             </Link>
           </header>
 
@@ -453,7 +453,7 @@ export default function RegisterPage() {
 
           {resultUrl && (
             <div id="qr-result" className="mt-7 rounded-2xl border border-[#eee8dc] bg-[#fffdf8] p-5 text-center">
-              <p className="text-xs font-bold text-[#8b8378]">생성된 Pet ID 링크</p>
+              <p className="text-xs font-bold text-[#8b8378]">생성된 Meong Grey 링크</p>
               <p className="mt-2 break-all text-sm text-[#4f493f]">{resultUrl}</p>
 
               <Image
