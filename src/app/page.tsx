@@ -49,7 +49,7 @@ export default function HomePage() {
           <header className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-2 font-bold">
               <span className="grid h-8 w-8 place-items-center rounded-full bg-[#fff0ba] text-lg">🐾</span>
-              Meong Grey
+              meonggrey
             </div>
             <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-bold text-[#6f6657] shadow-sm">
               QR 반려견 인식표
