@@ -52,14 +52,14 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
-    const { registration_code, current_password, new_password } = await req.json();
-    const code = String(registration_code || '').trim().toUpperCase();
+    const { user_id, current_password, new_password } = await req.json();
+    const normalizedUserId = String(user_id || '').trim().toLowerCase();
     const currentPassword = String(current_password || '');
     const newPassword = String(new_password || '');
 
-    if (!code || !currentPassword || !newPassword) {
+    if (!normalizedUserId || !currentPassword || !newPassword) {
       return NextResponse.json(
-        { error: '등록코드, 현재 비밀번호, 새 비밀번호를 모두 입력해주세요.' },
+        { error: '고객 ID, 현재 비밀번호, 새 비밀번호를 모두 입력해주세요.' },
         { status: 400 }
       );
     }
@@ -72,12 +72,13 @@ export async function PATCH(req: Request) {
     }
 
     const supabaseAdmin = getSupabaseAdmin();
-    const currentPasswordHash = hashPetPassword(currentPassword, code);
     const { data: pet, error: petError } = await supabaseAdmin
       .from('pets')
-      .select('id, password_hash')
-      .eq('registration_code', code)
+      .select('id, password_hash, registration_code')
+      .eq('user_id', normalizedUserId)
       .single();
+
+    const currentPasswordHash = pet ? hashPetPassword(currentPassword, pet.registration_code) : '';
 
     if (petError || !pet || pet.password_hash !== currentPasswordHash) {
       return NextResponse.json(
@@ -88,7 +89,7 @@ export async function PATCH(req: Request) {
 
     const { error: updateError } = await supabaseAdmin
       .from('pets')
-      .update({ password_hash: hashPetPassword(newPassword, code) })
+      .update({ password_hash: hashPetPassword(newPassword, pet.registration_code) })
       .eq('id', pet.id);
 
     if (updateError) {

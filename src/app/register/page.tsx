@@ -10,6 +10,7 @@ const MAX_PET_NAME_LENGTH = 20;
 const MAX_OWNER_NAME_LENGTH = 20;
 const MAX_LOCATION_LENGTH = 50;
 const MAX_EMERGENCY_NOTE_LENGTH = 200;
+const MAX_USER_ID_LENGTH = 20;
 const GENDER_OPTIONS = [
   { value: 'male', label: '남아' },
   { value: 'female', label: '여아' },
@@ -53,7 +54,9 @@ async function readJsonResponse(res: Response) {
 export default function RegisterPage() {
   const [form, setForm] = useState({
     registration_code: '',
+    user_id: '',
     password: '',
+    password_confirm: '',
     pet_name: '',
     owner_name: '',
     phone: '',
@@ -73,6 +76,54 @@ export default function RegisterPage() {
   const [privacyAgreed, setPrivacyAgreed] = useState(false);
   const [privacyModalOpen, setPrivacyModalOpen] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
+  const [checkingUserId, setCheckingUserId] = useState(false);
+  const [userIdChecked, setUserIdChecked] = useState(false);
+  const [userIdAvailable, setUserIdAvailable] = useState(false);
+  const hasPasswordConfirmation = form.password_confirm.length > 0;
+  const passwordsMatch =
+    hasPasswordConfirmation && form.password.length >= 6 && form.password === form.password_confirm;
+
+  async function handleUserIdCheck() {
+    if (!form.user_id) {
+      alert('고객 ID를 먼저 입력해주세요.');
+      return;
+    }
+
+    setCheckingUserId(true);
+
+    try {
+      const res = await fetch('/api/pets/user-id', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: form.user_id }),
+      });
+      const data = await readJsonResponse(res);
+
+      if (!res.ok) {
+        const errorMessage = data?.error || '고객 ID를 확인하지 못했어요.';
+        setUserIdChecked(false);
+        setUserIdAvailable(false);
+        alert(errorMessage);
+        return;
+      }
+
+      setUserIdChecked(true);
+      setUserIdAvailable(Boolean(data?.available));
+
+      if (data?.available) {
+        alert('사용 가능한 고객 ID예요.');
+        return;
+      }
+
+      alert('이미 사용 중인 고객 ID예요. 다른 ID를 입력해주세요.');
+    } catch {
+      setUserIdChecked(false);
+      setUserIdAvailable(false);
+      alert('고객 ID를 확인하는 중 오류가 발생했어요.');
+    } finally {
+      setCheckingUserId(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -82,13 +133,23 @@ export default function RegisterPage() {
     try {
       const registrationCode = form.registration_code.trim().toUpperCase();
 
-      if (!registrationCode || !form.password) {
-        alert('등록코드와 비밀번호를 입력해주세요.');
+      if (!registrationCode || !form.user_id || !form.password) {
+        alert('등록코드, 고객 ID, 비밀번호를 입력해주세요.');
+        return;
+      }
+
+      if (!userIdChecked || !userIdAvailable) {
+        alert('고객 ID 중복 확인을 완료해주세요.');
         return;
       }
 
       if (form.password.length < 6) {
         alert('비밀번호는 6자 이상 입력해주세요.');
+        return;
+      }
+
+      if (form.password !== form.password_confirm) {
+        alert('비밀번호 확인이 일치하지 않아요.');
         return;
       }
 
@@ -164,10 +225,10 @@ export default function RegisterPage() {
       <section className="mx-auto grid w-full max-w-6xl overflow-hidden rounded-[28px] border border-[#ece7dd] bg-white shadow-[0_24px_70px_rgba(55,45,30,0.12)] lg:grid-cols-[0.9fr_1.1fr]">
         <div className="relative hidden min-h-[720px] flex-col justify-between border-r border-[#f0ece4] bg-[linear-gradient(160deg,#fffaf0_0%,#ffffff_48%,#fff4cf_100%)] p-10 lg:flex">
           <header className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2 font-bold">
+            <Link href="/" className="flex items-center gap-2 font-bold">
               <span className="grid h-8 w-8 place-items-center rounded-full bg-[#fff0ba] text-lg">🐾</span>
               meonggrey
-            </div>
+            </Link>
             <span className="text-xs font-medium text-[#6f6657]">QR로 연결되는 우리 아이의 정보</span>
           </header>
 
@@ -230,6 +291,43 @@ export default function RegisterPage() {
                 </label>
 
                 <label className="block">
+                  <span className="mb-2 block text-sm font-bold">고객 ID <span className="text-[#ee6958]">*</span></span>
+                  <div className="flex gap-2">
+                    <input
+                      placeholder="예) meonggrey01"
+                      className="h-12 min-w-0 flex-1 rounded-xl border border-[#e7e2da] bg-white px-4 text-sm lowercase outline-none transition placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
+                      maxLength={MAX_USER_ID_LENGTH}
+                      value={form.user_id}
+                      onChange={(e) => {
+                        setForm({
+                          ...form,
+                          user_id: e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, MAX_USER_ID_LENGTH),
+                        });
+                        setUserIdChecked(false);
+                        setUserIdAvailable(false);
+                      }}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={handleUserIdCheck}
+                      disabled={checkingUserId || form.user_id.length < 4}
+                      className="shrink-0 rounded-xl border border-[#d8cfbf] bg-white px-4 text-sm font-bold text-[#5f574c] transition hover:border-[#f2bd33] hover:bg-[#fff8e5] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {checkingUserId ? '확인 중' : '중복 확인'}
+                    </button>
+                  </div>
+                  <span className="mt-2 block text-xs leading-5 text-[#8b8378]">
+                    수정할 때 사용할 로그인용 ID예요. {form.user_id.length}/{MAX_USER_ID_LENGTH}자
+                  </span>
+                  {userIdChecked && (
+                    <span className={`mt-1 block text-xs font-bold ${userIdAvailable ? 'text-[#2f9d46]' : 'text-[#ee6958]'}`}>
+                      {userIdAvailable ? '사용 가능한 고객 ID예요.' : '이미 사용 중인 고객 ID예요.'}
+                    </span>
+                  )}
+                </label>
+
+                <label className="block">
                   <span className="mb-2 block text-sm font-bold">비밀번호 <span className="text-[#ee6958]">*</span></span>
                   <input
                     type="password"
@@ -243,8 +341,28 @@ export default function RegisterPage() {
                     required
                   />
                   <span className="mt-2 block text-xs leading-5 text-[#8b8378]">
-                    등록코드와 비밀번호는 추후 정보 수정에 사용됩니다.
+                    고객 ID와 비밀번호는 추후 정보 수정에 사용됩니다.
                   </span>
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-bold">비밀번호 확인 <span className="text-[#ee6958]">*</span></span>
+                  <input
+                    type="password"
+                    placeholder="비밀번호를 한 번 더 입력해주세요"
+                    className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm outline-none transition placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
+                    value={form.password_confirm}
+                    onChange={(e) =>
+                      setForm({ ...form, password_confirm: e.target.value })
+                    }
+                    minLength={6}
+                    required
+                  />
+                  {hasPasswordConfirmation && (
+                    <span className={`mt-2 block text-xs font-bold ${passwordsMatch ? 'text-[#2f9d46]' : 'text-[#ee6958]'}`}>
+                      {passwordsMatch ? '비밀번호가 일치해요.' : '비밀번호가 일치하지 않아요.'}
+                    </span>
+                  )}
                 </label>
               </div>
             </div>

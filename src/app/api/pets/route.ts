@@ -9,6 +9,7 @@ const MAX_PET_NAME_LENGTH = 20;
 const MAX_OWNER_NAME_LENGTH = 20;
 const MAX_LOCATION_LENGTH = 50;
 const MAX_EMERGENCY_NOTE_LENGTH = 200;
+const MAX_USER_ID_LENGTH = 20;
 const ALLOWED_GENDERS = new Set(['', 'male', 'female']);
 
 function getFormString(formData: FormData, name: string) {
@@ -40,6 +41,20 @@ function parseGender(value: string) {
   }
 
   return value || null;
+}
+
+function parseUserId(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  if (!normalized) {
+    throw new Error('고객 ID를 입력해주세요.');
+  }
+
+  if (!/^[a-z0-9._-]{4,20}$/.test(normalized)) {
+    throw new Error('고객 ID는 4~20자의 영문 소문자, 숫자, 점(.), 밑줄(_), 하이픈(-)만 사용할 수 있어요.');
+  }
+
+  return normalized;
 }
 
 function validateTextLength(value: string, maxLength: number, label: string) {
@@ -148,6 +163,7 @@ export async function POST(req: Request) {
     const owner_name = getFormString(formData, 'owner_name');
     const phone = getFormString(formData, 'phone');
     const emergency_phone = getFormString(formData, 'emergency_phone');
+    const user_id = getFormString(formData, 'user_id');
     const gender = getFormString(formData, 'gender');
     const birth_year = getFormString(formData, 'birth_year');
     const animal_registration_number = getFormString(formData, 'animal_registration_number');
@@ -156,9 +172,11 @@ export async function POST(req: Request) {
     const code = getFormString(formData, 'registration_code').toUpperCase();
     const plainPassword = getFormString(formData, 'password');
     const imageFile = formData.get('image_file');
+    const parsedUserId = parseUserId(user_id);
     const parsedGender = parseGender(gender);
     const parsedBirthYear = parseBirthYear(birth_year);
 
+    validateTextLength(parsedUserId, MAX_USER_ID_LENGTH, '고객 ID');
     validateTextLength(pet_name, MAX_PET_NAME_LENGTH, '반려견 이름');
     validateTextLength(owner_name, MAX_OWNER_NAME_LENGTH, '보호자 이름');
     validateTextLength(location, MAX_LOCATION_LENGTH, '활동 지역');
@@ -198,6 +216,26 @@ export async function POST(req: Request) {
       );
     }
 
+    const { data: existingUserId, error: existingUserIdError } = await supabaseAdmin
+      .from('pets')
+      .select('id')
+      .eq('user_id', parsedUserId)
+      .maybeSingle();
+
+    if (existingUserIdError) {
+      return NextResponse.json(
+        { error: existingUserIdError.message },
+        { status: 500 }
+      );
+    }
+
+    if (existingUserId) {
+      return NextResponse.json(
+        { error: '이미 사용 중인 고객 ID예요. 다른 ID를 입력해주세요.' },
+        { status: 409 }
+      );
+    }
+
     const id = nanoid(8);
     const baseUrl =
       process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
@@ -224,6 +262,7 @@ export async function POST(req: Request) {
     const { error } = await supabaseAdmin.from('pets').insert({
       id,
       registration_code: code,
+      user_id: parsedUserId,
       password_hash: passwordHash,
       pet_name,
       owner_name,
@@ -278,7 +317,8 @@ export async function PATCH(req: Request) {
   try {
     const supabaseAdmin = getSupabaseAdmin();
     const formData = await req.formData();
-    const code = getFormString(formData, 'registration_code').toUpperCase();
+    const current_user_id = getFormString(formData, 'current_user_id');
+    const user_id = getFormString(formData, 'user_id');
     const plainPassword = getFormString(formData, 'password');
     const imageFile = formData.get('image_file');
     const gender = getFormString(formData, 'gender');
@@ -286,33 +326,57 @@ export async function PATCH(req: Request) {
     const owner_name = getFormString(formData, 'owner_name');
     const location = getFormString(formData, 'location');
     const emergency_note = getFormString(formData, 'emergency_note');
+    const currentParsedUserId = parseUserId(current_user_id);
+    const parsedUserId = parseUserId(user_id);
     const parsedGender = parseGender(gender);
     const parsedBirthYear = parseBirthYear(getFormString(formData, 'birth_year'));
 
+    validateTextLength(parsedUserId, MAX_USER_ID_LENGTH, '고객 ID');
     validateTextLength(pet_name, MAX_PET_NAME_LENGTH, '반려견 이름');
     validateTextLength(owner_name, MAX_OWNER_NAME_LENGTH, '보호자 이름');
     validateTextLength(location, MAX_LOCATION_LENGTH, '활동 지역');
     validateTextLength(emergency_note, MAX_EMERGENCY_NOTE_LENGTH, '특이사항');
 
-    if (!code || !plainPassword) {
+    if (!currentParsedUserId || !parsedUserId || !plainPassword) {
       return NextResponse.json(
-        { error: '등록코드와 비밀번호를 입력해주세요.' },
+        { error: '고객 ID와 비밀번호를 입력해주세요.' },
         { status: 400 }
       );
     }
 
-    const passwordHash = hashPetPassword(plainPassword, code);
-
     const { data: pet, error: petError } = await supabaseAdmin
       .from('pets')
-      .select('id, password_hash, image_url')
-      .eq('registration_code', code)
+      .select('id, password_hash, image_url, registration_code')
+      .eq('user_id', currentParsedUserId)
       .single();
+
+    const passwordHash = pet ? hashPetPassword(plainPassword, pet.registration_code) : '';
 
     if (petError || !pet || pet.password_hash !== passwordHash) {
       return NextResponse.json(
-        { error: '등록코드 또는 비밀번호가 올바르지 않습니다.' },
+        { error: '고객 ID 또는 비밀번호가 올바르지 않습니다.' },
         { status: 401 }
+      );
+    }
+
+    const { data: duplicatedUserId, error: duplicatedUserIdError } = await supabaseAdmin
+      .from('pets')
+      .select('id')
+      .eq('user_id', parsedUserId)
+      .neq('id', pet.id)
+      .maybeSingle();
+
+    if (duplicatedUserIdError) {
+      return NextResponse.json(
+        { error: duplicatedUserIdError.message },
+        { status: 500 }
+      );
+    }
+
+    if (duplicatedUserId) {
+      return NextResponse.json(
+        { error: '이미 사용 중인 고객 ID예요. 다른 ID를 입력해주세요.' },
+        { status: 409 }
       );
     }
 
@@ -330,6 +394,7 @@ export async function PATCH(req: Request) {
     }
 
     const updateData = {
+      user_id: parsedUserId,
       pet_name,
       owner_name,
       phone: getFormString(formData, 'phone'),

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 export default function HomePage() {
-  const [lookupCode, setLookupCode] = useState('');
+  const [lookupUserId, setLookupUserId] = useState('');
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupMessage, setLookupMessage] = useState('');
   const [lookupResult, setLookupResult] = useState<{
@@ -23,7 +23,7 @@ export default function HomePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          registration_code: lookupCode.trim().toUpperCase(),
+          user_id: lookupUserId.trim().toLowerCase(),
         }),
       });
       const data = await res.json();
@@ -66,7 +66,7 @@ export default function HomePage() {
               따뜻한 인식표 <span className="text-[#f5c548]">♥</span>
             </h1>
             <p className="mt-6 max-w-md text-[15px] leading-7 text-[#60594e]">
-              등록코드로 반려견 정보를 등록하고, QR 스캔 시 보호자 연락처와 필요한 정보를 바로 확인할 수 있어요.
+              등록코드로 반려견 정보를 등록하고, 고객 ID로 공개 URL을 찾고, QR 스캔 시 보호자 연락처와 필요한 정보를 바로 확인할 수 있어요.
             </p>
 
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
@@ -90,15 +90,15 @@ export default function HomePage() {
             >
               <div className="mb-4">
                 <p className="text-sm font-black text-[#d69b14]">URL 조회</p>
-                <h2 className="mt-2 text-xl font-black">등록번호로 공개 URL 찾기</h2>
+                <h2 className="mt-2 text-xl font-black">고객 ID로 공개 URL 찾기</h2>
               </div>
 
               <div className="flex flex-col gap-3">
                 <input
-                  placeholder="예) PET-ABCD1234"
-                  className="h-13 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm uppercase outline-none transition placeholder:normal-case placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
-                  value={lookupCode}
-                  onChange={(e) => setLookupCode(e.target.value.toUpperCase())}
+                  placeholder="예) meonggrey01"
+                  className="h-13 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm lowercase outline-none transition placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
+                  value={lookupUserId}
+                  onChange={(e) => setLookupUserId(e.target.value.toLowerCase())}
                   required
                 />
                 <button
@@ -135,7 +135,7 @@ export default function HomePage() {
             {[
               ['01', '등록코드 입력'],
               ['02', '반려견 정보 등록'],
-              ['03', 'QR로 보호자 연결'],
+              ['03', '고객 ID로 URL 조회'],
             ].map(([step, title]) => (
               <div key={step} className="rounded-2xl border border-[#eee8dc] bg-white/80 p-4">
                 <p className="text-xs font-black text-[#d69b14]">{step}</p>

@@ -3,12 +3,12 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 export async function POST(req: Request) {
   const supabaseAdmin = getSupabaseAdmin();
-  const { registration_code } = await req.json();
-  const code = String(registration_code || '').trim().toUpperCase();
+  const { user_id } = await req.json();
+  const normalizedUserId = String(user_id || '').trim().toLowerCase();
 
-  if (!code) {
+  if (!normalizedUserId) {
     return NextResponse.json(
-      { error: '등록번호를 입력해주세요.' },
+      { error: '고객 ID를 입력해주세요.' },
       { status: 400 }
     );
   }
@@ -16,7 +16,7 @@ export async function POST(req: Request) {
   const { data: pet, error } = await supabaseAdmin
     .from('pets')
     .select('id, pet_name')
-    .eq('registration_code', code)
+    .eq('user_id', normalizedUserId)
     .single();
 
   if (error || !pet) {

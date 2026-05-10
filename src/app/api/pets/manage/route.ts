@@ -5,28 +5,28 @@ import { hashPetPassword } from '@/lib/pet-password';
 export async function POST(req: Request) {
   try {
     const supabaseAdmin = getSupabaseAdmin();
-    const { registration_code, password } = await req.json();
-    const code = String(registration_code || '').trim().toUpperCase();
+    const { user_id, password } = await req.json();
+    const normalizedUserId = String(user_id || '').trim().toLowerCase();
     const plainPassword = String(password || '');
 
-    if (!code || !plainPassword) {
+    if (!normalizedUserId || !plainPassword) {
       return NextResponse.json(
-        { error: '등록코드와 비밀번호를 입력해주세요.' },
+        { error: '고객 ID와 비밀번호를 입력해주세요.' },
         { status: 400 }
       );
     }
 
-    const passwordHash = hashPetPassword(plainPassword, code);
-
     const { data, error } = await supabaseAdmin
       .from('pets')
-      .select('id, registration_code, password_hash, pet_name, owner_name, phone, emergency_phone, gender, birth_year, animal_registration_number, emergency_note, image_url, location')
-      .eq('registration_code', code)
+      .select('id, registration_code, user_id, password_hash, pet_name, owner_name, phone, emergency_phone, gender, birth_year, animal_registration_number, emergency_note, image_url, location')
+      .eq('user_id', normalizedUserId)
       .single();
+
+    const passwordHash = data ? hashPetPassword(plainPassword, data.registration_code) : '';
 
     if (error || !data || data.password_hash !== passwordHash) {
       return NextResponse.json(
-        { error: '등록코드 또는 비밀번호가 올바르지 않습니다.' },
+        { error: '고객 ID 또는 비밀번호가 올바르지 않습니다.' },
         { status: 401 }
       );
     }
@@ -35,6 +35,7 @@ export async function POST(req: Request) {
       pet: {
         id: data.id,
         registration_code: data.registration_code,
+        user_id: data.user_id,
         pet_name: data.pet_name,
         owner_name: data.owner_name,
         phone: data.phone,

@@ -10,12 +10,14 @@ const MAX_PET_NAME_LENGTH = 20;
 const MAX_OWNER_NAME_LENGTH = 20;
 const MAX_LOCATION_LENGTH = 50;
 const MAX_EMERGENCY_NOTE_LENGTH = 200;
+const MAX_USER_ID_LENGTH = 20;
 const GENDER_OPTIONS = [
   { value: 'male', label: '남아' },
   { value: 'female', label: '여아' },
 ] as const;
 
 type PetForm = {
+  user_id: string;
   pet_name: string;
   owner_name: string;
   phone: string;
@@ -58,7 +60,7 @@ function getAgeFromBirthYear(birthYear: string) {
 export default function EditPage() {
   const router = useRouter();
   const [credentials, setCredentials] = useState({
-    registration_code: '',
+    user_id: '',
     password: '',
   });
   const [form, setForm] = useState<PetForm | null>(null);
@@ -70,6 +72,11 @@ export default function EditPage() {
     new_password: '',
     confirm_password: '',
   });
+  const hasPasswordConfirmation = passwordForm.confirm_password.length > 0;
+  const passwordsMatch =
+    hasPasswordConfirmation &&
+    passwordForm.new_password.length >= 6 &&
+    passwordForm.new_password === passwordForm.confirm_password;
 
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -81,7 +88,7 @@ export default function EditPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          registration_code: credentials.registration_code.trim().toUpperCase(),
+          user_id: credentials.user_id.trim().toLowerCase(),
           password: credentials.password,
         }),
       });
@@ -93,6 +100,7 @@ export default function EditPage() {
       }
 
       setForm({
+        user_id: data.pet.user_id || '',
         pet_name: data.pet.pet_name || '',
         owner_name: data.pet.owner_name || '',
         phone: data.pet.phone || '',
@@ -126,7 +134,8 @@ export default function EditPage() {
 
       Object.entries({
         ...form,
-        registration_code: credentials.registration_code.trim().toUpperCase(),
+        current_user_id: credentials.user_id.trim().toLowerCase(),
+        user_id: credentials.user_id.trim().toLowerCase(),
         password: credentials.password,
       }).forEach(([key, value]) => {
         formData.append(key, value);
@@ -148,6 +157,7 @@ export default function EditPage() {
       }
 
       setForm({ ...form, image_url: data.image_url || form.image_url });
+      setCredentials({ ...credentials, user_id: form.user_id.trim().toLowerCase() });
       setImageFile(null);
       alert('수정이 완료됐어요.');
       router.push('/');
@@ -180,7 +190,7 @@ export default function EditPage() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          registration_code: credentials.registration_code.trim().toUpperCase(),
+          user_id: credentials.user_id.trim().toLowerCase(),
           current_password: credentials.password,
           new_password: passwordForm.new_password,
         }),
@@ -213,7 +223,7 @@ export default function EditPage() {
           <p className="mb-3 text-sm font-bold text-[#d69b14]">Edit Pet Info</p>
           <h1 className="text-3xl font-black leading-tight sm:text-4xl">반려견 정보 수정</h1>
           <p className="mt-4 text-sm leading-6 text-[#6f6657]">
-            등록코드와 비밀번호를 입력하면 등록된 정보를 수정할 수 있어요.<br></br>
+            고객 ID와 비밀번호를 입력하면 등록된 정보를 수정할 수 있어요.<br></br>
             만약 비밀번호를 잊어버렸다면 판매자에게 문의하세요
           </p>
         </header>
@@ -221,13 +231,17 @@ export default function EditPage() {
         {!form ? (
           <form onSubmit={handleLogin} className="space-y-4">
             <label className="block">
-              <span className="mb-2 block text-sm font-bold">등록코드</span>
+              <span className="mb-2 block text-sm font-bold">고객 ID</span>
               <input
-                placeholder="예) PET-ABCD1234"
-                className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm uppercase outline-none transition placeholder:normal-case placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
-                value={credentials.registration_code}
+                placeholder="예) meonggrey01"
+                className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm lowercase outline-none transition placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
+                maxLength={MAX_USER_ID_LENGTH}
+                value={credentials.user_id}
                 onChange={(e) =>
-                  setCredentials({ ...credentials, registration_code: e.target.value.toUpperCase() })
+                  setCredentials({
+                    ...credentials,
+                    user_id: e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, MAX_USER_ID_LENGTH),
+                  })
                 }
                 required
               />
@@ -269,6 +283,18 @@ export default function EditPage() {
                   />
                 </div>
               )}
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-bold">고객 ID</span>
+                <input
+                  className="h-12 w-full rounded-xl border border-[#e7e2da] bg-[#f7f3ec] px-4 text-sm lowercase text-[#6f6657] outline-none"
+                  value={form.user_id}
+                  readOnly
+                />
+                <span className="mt-2 block text-xs leading-5 text-[#8b8378]">
+                  고객 ID는 등록 후 변경할 수 없어요.
+                </span>
+              </label>
 
               <label className="block">
                 <span className="mb-2 block text-sm font-bold">반려견 이름</span>
@@ -441,6 +467,11 @@ export default function EditPage() {
                   onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })}
                   minLength={6}
                 />
+                {hasPasswordConfirmation && (
+                  <span className={`mt-2 block text-xs font-bold ${passwordsMatch ? 'text-[#2f9d46]' : 'text-[#ee6958]'}`}>
+                    {passwordsMatch ? '비밀번호가 일치해요.' : '비밀번호가 일치하지 않아요.'}
+                  </span>
+                )}
               </label>
 
               <button

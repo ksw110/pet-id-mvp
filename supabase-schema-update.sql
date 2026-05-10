@@ -7,6 +7,7 @@ create table if not exists registration_codes (
 
 alter table pets
 add column if not exists emergency_phone text,
+add column if not exists user_id text unique,
 add column if not exists gender text,
 add column if not exists birth_year integer,
 add column if not exists animal_registration_number text,
@@ -19,6 +20,9 @@ on registration_codes (pet_id);
 
 create index if not exists pets_registration_code_idx
 on pets (registration_code);
+
+create index if not exists pets_user_id_idx
+on pets (user_id);
 
 -- 등록코드는 관리자가 고객에게 전달하기 전에 미리 생성해둡니다.
 -- 예시:
