@@ -53,7 +53,8 @@ export default async function Page({ params }: Props) {
         <div className="grid w-full md:grid-cols-[0.62fr_1fr] md:items-center md:gap-8 md:p-8">
           <div className="px-4 pt-4 sm:px-5 sm:pt-5 md:self-center md:px-0 md:pt-0">
             <div className="mx-auto w-full max-w-[220px] sm:max-w-[260px] md:max-w-[320px]">
-              <div className="relative aspect-square overflow-hidden rounded-full border-4 border-white bg-[#f6f0e8] shadow-[0_18px_40px_rgba(37,29,18,0.16)]">
+              <div className="relative aspect-square rounded-full border-4 border-white bg-[#f6f0e8] shadow-[0_18px_40px_rgba(37,29,18,0.16)]">
+                <div className="absolute inset-0 overflow-hidden rounded-full">
                 {data.image_url ? (
                   <>
                     <Image
@@ -63,7 +64,7 @@ export default async function Page({ params }: Props) {
                       unoptimized
                       aria-hidden="true"
                       sizes="(max-width: 640px) 220px, (max-width: 768px) 260px, 320px"
-                      className="scale-110 object-cover opacity-35 blur-xl"
+                      className="rounded-full scale-110 object-cover opacity-35 blur-xl"
                     />
                     <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,250,240,0.42))]" />
                     <Image
@@ -73,7 +74,7 @@ export default async function Page({ params }: Props) {
                       unoptimized
                       priority
                       sizes="(max-width: 640px) 220px, (max-width: 768px) 260px, 320px"
-                      className="object-cover object-center drop-shadow-[0_18px_32px_rgba(37,29,18,0.22)]"
+                      className="rounded-full object-cover object-center drop-shadow-[0_18px_32px_rgba(37,29,18,0.22)]"
                     />
                   </>
                 ) : (
@@ -81,6 +82,7 @@ export default async function Page({ params }: Props) {
                     <span className="text-[72px] leading-none sm:text-[92px] md:text-[112px]">🐶</span>
                   </div>
                 )}
+                </div>
               </div>
             </div>
           </div>

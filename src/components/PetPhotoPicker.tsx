@@ -386,7 +386,7 @@ function ImageCropDialog({
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="h-12 flex-1 rounded-xl border border-[#ddd6c9] bg-white px-4 text-sm font-bold text-[#5f574c] disabled:opacity-60"
+              className="min-h-16 flex-1 rounded-2xl border border-[#ddd6c9] bg-white px-5 py-4 text-[17px] font-bold text-[#5f574c] disabled:opacity-60"
             >
               취소
             </button>
@@ -394,7 +394,7 @@ function ImageCropDialog({
               type="button"
               onClick={handleComplete}
               disabled={!loadedImage || saving}
-              className="h-12 flex-1 rounded-xl bg-[#ffd766] px-4 text-sm font-black text-[#211a0c] shadow-[0_10px_24px_rgba(229,173,36,0.28)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="min-h-16 flex-1 rounded-2xl bg-[#ffd766] px-5 py-4 text-[17px] font-black text-[#211a0c] shadow-[0_10px_24px_rgba(229,173,36,0.28)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {saving ? '사진 준비 중...' : '이 영역으로 사용하기'}
             </button>
