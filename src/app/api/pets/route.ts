@@ -5,8 +5,47 @@ import { hashPetPassword } from '@/lib/pet-password';
 import QRCode from 'qrcode';
 import { Buffer } from 'node:buffer';
 
+const MAX_PET_NAME_LENGTH = 20;
+const MAX_OWNER_NAME_LENGTH = 20;
+const MAX_LOCATION_LENGTH = 50;
+const MAX_EMERGENCY_NOTE_LENGTH = 200;
+const ALLOWED_GENDERS = new Set(['', 'male', 'female']);
+
 function getFormString(formData: FormData, name: string) {
   return String(formData.get(name) || '').trim();
+}
+
+function parseBirthYear(value: string) {
+  if (!value) {
+    return null;
+  }
+
+  if (!/^\d{4}$/.test(value)) {
+    throw new Error('태어난 연도는 4자리 숫자로 입력해주세요.');
+  }
+
+  const year = Number(value);
+  const currentYear = new Date().getFullYear();
+
+  if (year < 2000 || year > currentYear) {
+    throw new Error(`태어난 연도는 2000년부터 ${currentYear}년 사이로 입력해주세요.`);
+  }
+
+  return year;
+}
+
+function parseGender(value: string) {
+  if (!ALLOWED_GENDERS.has(value)) {
+    throw new Error('성별은 남아 또는 여아만 선택할 수 있어요.');
+  }
+
+  return value || null;
+}
+
+function validateTextLength(value: string, maxLength: number, label: string) {
+  if (value.length > maxLength) {
+    throw new Error(`${label}은(는) ${maxLength}자 이하로 입력해주세요.`);
+  }
 }
 
 function getUploadFileName(file: File, fallbackName: string) {
@@ -109,12 +148,21 @@ export async function POST(req: Request) {
     const owner_name = getFormString(formData, 'owner_name');
     const phone = getFormString(formData, 'phone');
     const emergency_phone = getFormString(formData, 'emergency_phone');
+    const gender = getFormString(formData, 'gender');
+    const birth_year = getFormString(formData, 'birth_year');
     const animal_registration_number = getFormString(formData, 'animal_registration_number');
     const emergency_note = getFormString(formData, 'emergency_note');
     const location = getFormString(formData, 'location');
     const code = getFormString(formData, 'registration_code').toUpperCase();
     const plainPassword = getFormString(formData, 'password');
     const imageFile = formData.get('image_file');
+    const parsedGender = parseGender(gender);
+    const parsedBirthYear = parseBirthYear(birth_year);
+
+    validateTextLength(pet_name, MAX_PET_NAME_LENGTH, '반려견 이름');
+    validateTextLength(owner_name, MAX_OWNER_NAME_LENGTH, '보호자 이름');
+    validateTextLength(location, MAX_LOCATION_LENGTH, '활동 지역');
+    validateTextLength(emergency_note, MAX_EMERGENCY_NOTE_LENGTH, '특이사항');
 
     if (!code || !plainPassword || !pet_name || !owner_name || !phone) {
       return NextResponse.json(
@@ -181,6 +229,8 @@ export async function POST(req: Request) {
       owner_name,
       phone,
       emergency_phone,
+      gender: parsedGender,
+      birth_year: parsedBirthYear,
       animal_registration_number,
       emergency_note,
       image_url: imageUrl,
@@ -231,6 +281,18 @@ export async function PATCH(req: Request) {
     const code = getFormString(formData, 'registration_code').toUpperCase();
     const plainPassword = getFormString(formData, 'password');
     const imageFile = formData.get('image_file');
+    const gender = getFormString(formData, 'gender');
+    const pet_name = getFormString(formData, 'pet_name');
+    const owner_name = getFormString(formData, 'owner_name');
+    const location = getFormString(formData, 'location');
+    const emergency_note = getFormString(formData, 'emergency_note');
+    const parsedGender = parseGender(gender);
+    const parsedBirthYear = parseBirthYear(getFormString(formData, 'birth_year'));
+
+    validateTextLength(pet_name, MAX_PET_NAME_LENGTH, '반려견 이름');
+    validateTextLength(owner_name, MAX_OWNER_NAME_LENGTH, '보호자 이름');
+    validateTextLength(location, MAX_LOCATION_LENGTH, '활동 지역');
+    validateTextLength(emergency_note, MAX_EMERGENCY_NOTE_LENGTH, '특이사항');
 
     if (!code || !plainPassword) {
       return NextResponse.json(
@@ -268,14 +330,16 @@ export async function PATCH(req: Request) {
     }
 
     const updateData = {
-      pet_name: getFormString(formData, 'pet_name'),
-      owner_name: getFormString(formData, 'owner_name'),
+      pet_name,
+      owner_name,
       phone: getFormString(formData, 'phone'),
       emergency_phone: getFormString(formData, 'emergency_phone'),
+      gender: parsedGender,
+      birth_year: parsedBirthYear,
       animal_registration_number: getFormString(formData, 'animal_registration_number'),
-      emergency_note: getFormString(formData, 'emergency_note'),
+      emergency_note,
       image_url: imageUrl,
-      location: getFormString(formData, 'location'),
+      location,
     };
 
     const { error: updateError } = await supabaseAdmin

@@ -1,17 +1,27 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import PetPhotoPicker from '@/components/PetPhotoPicker';
 
-const MAX_IMAGE_SIZE = 1200;
-const IMAGE_QUALITY = 0.82;
+const MAX_PET_NAME_LENGTH = 20;
+const MAX_OWNER_NAME_LENGTH = 20;
+const MAX_LOCATION_LENGTH = 50;
+const MAX_EMERGENCY_NOTE_LENGTH = 200;
+const GENDER_OPTIONS = [
+  { value: 'male', label: '남아' },
+  { value: 'female', label: '여아' },
+] as const;
 
 type PetForm = {
   pet_name: string;
   owner_name: string;
   phone: string;
   emergency_phone: string;
+  gender: string;
+  birth_year: string;
   animal_registration_number: string;
   emergency_note: string;
   image_url: string;
@@ -32,47 +42,17 @@ function formatPhoneNumber(value: string) {
   return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7)}`;
 }
 
-async function compressImage(file: File) {
-  const imageUrl = URL.createObjectURL(file);
-  const image = document.createElement('img');
+function getCurrentYear() {
+  return new Date().getFullYear();
+}
 
-  try {
-    await new Promise<void>((resolve, reject) => {
-      image.onload = () => resolve();
-      image.onerror = () => reject(new Error('이미지를 불러오지 못했습니다.'));
-      image.src = imageUrl;
-    });
-
-    const scale = Math.min(1, MAX_IMAGE_SIZE / Math.max(image.naturalWidth, image.naturalHeight));
-    const width = Math.round(image.naturalWidth * scale);
-    const height = Math.round(image.naturalHeight * scale);
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-
-    if (!context) {
-      return file;
-    }
-
-    canvas.width = width;
-    canvas.height = height;
-    context.drawImage(image, 0, 0, width, height);
-
-    const blob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob(resolve, 'image/jpeg', IMAGE_QUALITY);
-    });
-
-    if (!blob || blob.size >= file.size) {
-      return file;
-    }
-
-    const fileName = file.name.replace(/\.[^.]+$/, '') || 'pet-photo';
-    return new File([blob], `${fileName}.jpg`, {
-      type: 'image/jpeg',
-      lastModified: Date.now(),
-    });
-  } finally {
-    URL.revokeObjectURL(imageUrl);
+function getAgeFromBirthYear(birthYear: string) {
+  if (!/^\d{4}$/.test(birthYear)) {
+    return '';
   }
+
+  const age = getCurrentYear() - Number(birthYear);
+  return age >= 0 ? `${age}살` : '';
 }
 
 export default function EditPage() {
@@ -84,7 +64,7 @@ export default function EditPage() {
   const [form, setForm] = useState<PetForm | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-  const [compressing, setCompressing] = useState(false);
+  const [processingImage, setProcessingImage] = useState(false);
   const [message, setMessage] = useState('');
   const [passwordForm, setPasswordForm] = useState({
     new_password: '',
@@ -117,6 +97,8 @@ export default function EditPage() {
         owner_name: data.pet.owner_name || '',
         phone: data.pet.phone || '',
         emergency_phone: data.pet.emergency_phone || '',
+        gender: data.pet.gender || '',
+        birth_year: data.pet.birth_year ? String(data.pet.birth_year) : '',
         animal_registration_number: data.pet.animal_registration_number || '',
         emergency_note: data.pet.emergency_note || '',
         image_url: data.pet.image_url || '',
@@ -224,10 +206,10 @@ export default function EditPage() {
     <main className="min-h-screen bg-[#fbfaf7] px-4 py-6 text-[#171717] sm:px-6 sm:py-10">
       <section className="mx-auto w-full max-w-2xl overflow-hidden rounded-[28px] border border-[#ece7dd] bg-white p-5 shadow-[0_24px_70px_rgba(55,45,30,0.12)] sm:p-8">
         <header className="mb-8 border-b border-[#f0ece4] pb-5">
-          <div className="mb-8 flex items-center gap-2 font-bold">
+          <Link href="/" className="mb-8 flex items-center gap-2 font-bold">
             <span className="grid h-8 w-8 place-items-center rounded-full bg-[#fff0ba] text-lg">🐾</span>
             Pet ID
-          </div>
+          </Link>
           <p className="mb-3 text-sm font-bold text-[#d69b14]">Edit Pet Info</p>
           <h1 className="text-3xl font-black leading-tight sm:text-4xl">반려견 정보 수정</h1>
           <p className="mt-4 text-sm leading-6 text-[#6f6657]">
@@ -292,20 +274,28 @@ export default function EditPage() {
                 <span className="mb-2 block text-sm font-bold">반려견 이름</span>
                 <input
                   className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm outline-none transition focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
+                  maxLength={MAX_PET_NAME_LENGTH}
                   value={form.pet_name}
                   onChange={(e) => setForm({ ...form, pet_name: e.target.value })}
                   required
                 />
+                <span className="mt-2 block text-xs leading-5 text-[#8b8378]">
+                  {form.pet_name.length}/{MAX_PET_NAME_LENGTH}자
+                </span>
               </label>
 
               <label className="block">
                 <span className="mb-2 block text-sm font-bold">보호자 이름</span>
                 <input
                   className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm outline-none transition focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
+                  maxLength={MAX_OWNER_NAME_LENGTH}
                   value={form.owner_name}
                   onChange={(e) => setForm({ ...form, owner_name: e.target.value })}
                   required
                 />
+                <span className="mt-2 block text-xs leading-5 text-[#8b8378]">
+                  {form.owner_name.length}/{MAX_OWNER_NAME_LENGTH}자
+                </span>
               </label>
 
               <label className="block">
@@ -327,6 +317,48 @@ export default function EditPage() {
                 />
               </label>
 
+              <div className="block">
+                <span className="mb-2 block text-sm font-bold">성별 <span className="font-medium text-[#8b8378]">(선택)</span></span>
+                <div className="grid grid-cols-2 gap-3">
+                  {GENDER_OPTIONS.map((option) => (
+                    <label
+                      key={option.value}
+                      className={`flex h-12 cursor-pointer items-center justify-center rounded-xl border text-sm font-bold transition ${
+                        form.gender === option.value
+                          ? 'border-[#f2bd33] bg-[#fff8e5] text-[#8a5c00]'
+                          : 'border-[#e7e2da] bg-white text-[#6f6657]'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="gender"
+                        value={option.value}
+                        checked={form.gender === option.value}
+                        onChange={(e) => setForm({ ...form, gender: e.target.value })}
+                        className="sr-only"
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-bold">태어난 연도 <span className="font-medium text-[#8b8378]">(선택)</span></span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min="2000"
+                  max={getCurrentYear()}
+                  className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm outline-none transition focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
+                  value={form.birth_year}
+                  onChange={(e) => setForm({ ...form, birth_year: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                />
+                <span className="mt-2 block text-xs leading-5 text-[#8b8378]">
+                  입력하면 상세 화면에 현재 기준 {getAgeFromBirthYear(form.birth_year) || '나이'}로 표시돼요.
+                </span>
+              </label>
+
               <label className="block">
                 <span className="mb-2 block text-sm font-bold">동물등록번호 <span className="font-medium text-[#8b8378]">(선택)</span></span>
                 <input
@@ -340,56 +372,41 @@ export default function EditPage() {
                 <span className="mb-2 block text-sm font-bold">활동 지역 <span className="font-medium text-[#8b8378]">(선택)</span></span>
                 <input
                   className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm outline-none transition focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
+                  maxLength={MAX_LOCATION_LENGTH}
                   value={form.location}
                   onChange={(e) => setForm({ ...form, location: e.target.value })}
                 />
+                <span className="mt-2 block text-xs leading-5 text-[#8b8378]">
+                  {form.location.length}/{MAX_LOCATION_LENGTH}자
+                </span>
               </label>
 
               <label className="block">
                 <span className="mb-2 block text-sm font-bold">특이사항 <span className="font-medium text-[#8b8378]">(선택)</span></span>
                 <textarea
                   className="min-h-24 w-full resize-none rounded-xl border border-[#e7e2da] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
+                  maxLength={MAX_EMERGENCY_NOTE_LENGTH}
                   value={form.emergency_note}
                   onChange={(e) => setForm({ ...form, emergency_note: e.target.value })}
                 />
-              </label>
-
-              <label className="block">
-                <span className="mb-2 block text-sm font-bold">사진 변경 <span className="font-medium text-[#8b8378]">(선택)</span></span>
-                <span className="flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-[#d9d2c7] bg-[#fffdf8] px-4 py-5 text-center transition hover:border-[#f2bd33] hover:bg-[#fff8e5]">
-                  <span className="text-sm font-bold">
-                    {compressing ? '사진 최적화 중...' : imageFile?.name || '새 사진 선택하기'}
-                  </span>
-                  <span className="mt-1 text-xs text-[#8b8378]">선택하지 않으면 기존 사진이 유지됩니다</span>
+                <span className="mt-2 block text-xs leading-5 text-[#8b8378]">
+                  {form.emergency_note.length}/{MAX_EMERGENCY_NOTE_LENGTH}자
                 </span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="sr-only"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-
-                    if (!file) {
-                      return;
-                    }
-
-                    setCompressing(true);
-
-                    try {
-                      setImageFile(await compressImage(file));
-                    } catch {
-                      alert('사진 최적화에 실패했어요. 다른 사진으로 다시 시도해주세요.');
-                      e.target.value = '';
-                      setImageFile(null);
-                    } finally {
-                      setCompressing(false);
-                    }
-                  }}
-                />
               </label>
+
+              <PetPhotoPicker
+                label="사진 변경"
+                emptyText="새 사진 선택 후 영역 고르기"
+                helperText="선택하지 않으면 기존 사진이 유지됩니다"
+                hintText="새로 선택한 사진은 원하는 영역으로 잘라서 저장돼요."
+                value={imageFile}
+                existingImageUrl={form.image_url}
+                onChange={setImageFile}
+                onProcessingChange={setProcessingImage}
+              />
 
               <button
-                disabled={loading || compressing}
+                disabled={loading || processingImage}
                 className="h-13 w-full rounded-xl bg-[#ffd766] px-5 text-sm font-black text-[#211a0c] shadow-[0_10px_24px_rgba(229,173,36,0.28)] transition hover:bg-[#ffcc3d] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loading ? '저장 중...' : '수정 저장하기'}

@@ -20,7 +20,7 @@ export async function POST(req: Request) {
 
     const { data, error } = await supabaseAdmin
       .from('pets')
-      .select('id, registration_code, password_hash, pet_name, owner_name, phone, emergency_phone, animal_registration_number, emergency_note, image_url, location')
+      .select('id, registration_code, password_hash, pet_name, owner_name, phone, emergency_phone, gender, birth_year, animal_registration_number, emergency_note, image_url, location')
       .eq('registration_code', code)
       .single();
 
@@ -39,6 +39,8 @@ export async function POST(req: Request) {
         owner_name: data.owner_name,
         phone: data.phone,
         emergency_phone: data.emergency_phone,
+        gender: data.gender,
+        birth_year: data.birth_year,
         animal_registration_number: data.animal_registration_number,
         emergency_note: data.emergency_note,
         image_url: data.image_url,

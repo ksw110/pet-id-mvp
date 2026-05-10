@@ -1,59 +1,19 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import Image from 'next/image';
+import PetPhotoPicker from '@/components/PetPhotoPicker';
 import PrivacyPolicyContent from '../privacy/PrivacyPolicyContent';
 
-const MAX_IMAGE_SIZE = 1200;
-const IMAGE_QUALITY = 0.82;
-const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
-
-function formatFileSize(bytes: number) {
-  return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
-}
-
-async function compressImage(file: File) {
-  const imageUrl = URL.createObjectURL(file);
-  const image = document.createElement('img');
-
-  try {
-    await new Promise<void>((resolve, reject) => {
-      image.onload = () => resolve();
-      image.onerror = () => reject(new Error('이미지를 불러오지 못했습니다.'));
-      image.src = imageUrl;
-    });
-
-    const scale = Math.min(1, MAX_IMAGE_SIZE / Math.max(image.naturalWidth, image.naturalHeight));
-    const width = Math.round(image.naturalWidth * scale);
-    const height = Math.round(image.naturalHeight * scale);
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-
-    if (!context) {
-      return file;
-    }
-
-    canvas.width = width;
-    canvas.height = height;
-    context.drawImage(image, 0, 0, width, height);
-
-    const blob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob(resolve, 'image/jpeg', IMAGE_QUALITY);
-    });
-
-    if (!blob || blob.size >= file.size) {
-      return file;
-    }
-
-    const fileName = file.name.replace(/\.[^.]+$/, '') || 'pet-photo';
-    return new File([blob], `${fileName}.jpg`, {
-      type: 'image/jpeg',
-      lastModified: Date.now(),
-    });
-  } finally {
-    URL.revokeObjectURL(imageUrl);
-  }
-}
+const MAX_PET_NAME_LENGTH = 20;
+const MAX_OWNER_NAME_LENGTH = 20;
+const MAX_LOCATION_LENGTH = 50;
+const MAX_EMERGENCY_NOTE_LENGTH = 200;
+const GENDER_OPTIONS = [
+  { value: 'male', label: '남아' },
+  { value: 'female', label: '여아' },
+] as const;
 
 function formatPhoneNumber(value: string) {
   const numbers = value.replace(/\D/g, '').slice(0, 11);
@@ -67,6 +27,19 @@ function formatPhoneNumber(value: string) {
   }
 
   return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7)}`;
+}
+
+function getCurrentYear() {
+  return new Date().getFullYear();
+}
+
+function getAgeFromBirthYear(birthYear: string) {
+  if (!/^\d{4}$/.test(birthYear)) {
+    return '';
+  }
+
+  const age = getCurrentYear() - Number(birthYear);
+  return age >= 0 ? `${age}살` : '';
 }
 
 async function readJsonResponse(res: Response) {
@@ -85,6 +58,8 @@ export default function RegisterPage() {
     owner_name: '',
     phone: '',
     emergency_phone: '',
+    gender: '',
+    birth_year: '',
     animal_registration_number: '',
     emergency_note: '',
     location: '',
@@ -94,11 +69,10 @@ export default function RegisterPage() {
   const [qrImage, setQrImage] = useState('');
   const [resultUrl, setResultUrl] = useState('');
   const [loading, setLoading] = useState(false);
-  const [compressing, setCompressing] = useState(false);
+  const [processingImage, setProcessingImage] = useState(false);
   const [privacyAgreed, setPrivacyAgreed] = useState(false);
   const [privacyModalOpen, setPrivacyModalOpen] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
-  const selectedFileName = imageFile?.name ?? '';
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -220,11 +194,10 @@ export default function RegisterPage() {
 
         <div className="p-5 sm:p-8 lg:p-10">
           <header className="mb-8 flex items-center justify-between border-b border-[#f0ece4] pb-5 lg:hidden">
-            <div className="flex items-center gap-2 font-bold">
+            <Link href="/" className="flex items-center gap-2 font-bold">
               <span className="grid h-8 w-8 place-items-center rounded-full bg-[#fff0ba] text-lg">🐾</span>
               Pet ID
-            </div>
-            <span className="text-xl">☰</span>
+            </Link>
           </header>
 
           <div className="mb-7 lg:hidden">
@@ -277,29 +250,37 @@ export default function RegisterPage() {
             </div>
 
             <label className="block">
-              <span className="mb-2 block text-sm font-bold">반려견 이름 <span className="text-[#ee6958]">*</span></span>
-              <input
-                placeholder="예) 코코"
-                className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm outline-none transition placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
-                value={form.pet_name}
-                onChange={(e) =>
-                  setForm({ ...form, pet_name: e.target.value })
-                }
-                required
-              />
-            </label>
+                <span className="mb-2 block text-sm font-bold">반려견 이름 <span className="text-[#ee6958]">*</span></span>
+                <input
+                  placeholder="예) 코코"
+                  className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm outline-none transition placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
+                  maxLength={MAX_PET_NAME_LENGTH}
+                  value={form.pet_name}
+                  onChange={(e) =>
+                    setForm({ ...form, pet_name: e.target.value })
+                  }
+                  required
+                />
+                <span className="mt-2 block text-xs leading-5 text-[#8b8378]">
+                  {form.pet_name.length}/{MAX_PET_NAME_LENGTH}자
+                </span>
+              </label>
 
             <label className="block">
               <span className="mb-2 block text-sm font-bold">보호자 이름 <span className="text-[#ee6958]">*</span></span>
               <input
                 placeholder="예) 홍길동"
                 className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm outline-none transition placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
+                maxLength={MAX_OWNER_NAME_LENGTH}
                 value={form.owner_name}
                 onChange={(e) =>
                   setForm({ ...form, owner_name: e.target.value })
                 }
                 required
               />
+              <span className="mt-2 block text-xs leading-5 text-[#8b8378]">
+                {form.owner_name.length}/{MAX_OWNER_NAME_LENGTH}자
+              </span>
             </label>
 
             <label className="block">
@@ -327,6 +308,51 @@ export default function RegisterPage() {
               />
             </label>
 
+            <div className="block">
+              <span className="mb-2 block text-sm font-bold">성별 <span className="font-medium text-[#8b8378]">(선택)</span></span>
+              <div className="grid grid-cols-2 gap-3">
+                {GENDER_OPTIONS.map((option) => (
+                  <label
+                    key={option.value}
+                    className={`flex h-12 cursor-pointer items-center justify-center rounded-xl border text-sm font-bold transition ${
+                      form.gender === option.value
+                        ? 'border-[#f2bd33] bg-[#fff8e5] text-[#8a5c00]'
+                        : 'border-[#e7e2da] bg-white text-[#6f6657]'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="gender"
+                      value={option.value}
+                      checked={form.gender === option.value}
+                      onChange={(e) => setForm({ ...form, gender: e.target.value })}
+                      className="sr-only"
+                    />
+                    {option.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-bold">태어난 연도 <span className="font-medium text-[#8b8378]">(선택)</span></span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min="2000"
+                max={getCurrentYear()}
+                placeholder={`예) ${getCurrentYear() - 3}`}
+                className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm outline-none transition placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
+                value={form.birth_year}
+                onChange={(e) =>
+                  setForm({ ...form, birth_year: e.target.value.replace(/\D/g, '').slice(0, 4) })
+                }
+              />
+              <span className="mt-2 block text-xs leading-5 text-[#8b8378]">
+                입력하면 상세 화면에 현재 기준 {getAgeFromBirthYear(form.birth_year) || '나이'}로 표시돼요.
+              </span>
+            </label>
+
             <label className="block">
               <span className="mb-2 block text-sm font-bold">동물등록번호 <span className="font-medium text-[#8b8378]">(선택)</span></span>
               <input
@@ -344,11 +370,15 @@ export default function RegisterPage() {
               <input
                 placeholder="예) 서울 강남구, 압구정동"
                 className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm outline-none transition placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
+                maxLength={MAX_LOCATION_LENGTH}
                 value={form.location}
                 onChange={(e) =>
                   setForm({ ...form, location: e.target.value })
                 }
               />
+              <span className="mt-2 block text-xs leading-5 text-[#8b8378]">
+                {form.location.length}/{MAX_LOCATION_LENGTH}자
+              </span>
             </label>
 
             <label className="block">
@@ -356,59 +386,27 @@ export default function RegisterPage() {
               <textarea
                 placeholder="예) 사람을 좋아해요. 겁이 많아요 등"
                 className="min-h-24 w-full resize-none rounded-xl border border-[#e7e2da] bg-white px-4 py-3 text-sm outline-none transition placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
+                maxLength={MAX_EMERGENCY_NOTE_LENGTH}
                 value={form.emergency_note}
                 onChange={(e) =>
                   setForm({ ...form, emergency_note: e.target.value })
                 }
               />
-            </label>
-
-            <label className="block">
-              <span className="mb-2 block text-sm font-bold">사진 등록 <span className="text-[#ee6958]">*</span></span>
-              <span className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-[#d9d2c7] bg-[#fffdf8] px-4 py-5 text-center transition hover:border-[#f2bd33] hover:bg-[#fff8e5]">
-                <span className="mb-2 grid h-10 w-10 place-items-center rounded-full bg-white text-xl shadow-sm">📷</span>
-                <span className="text-sm font-bold">
-                  {compressing ? '사진 최적화 중...' : selectedFileName || '사진 선택하기'}
-                </span>
-                <span className="mt-1 text-xs text-[#8b8378]">자동 압축 후 업로드됩니다</span>
+              <span className="mt-2 block text-xs leading-5 text-[#8b8378]">
+                {form.emergency_note.length}/{MAX_EMERGENCY_NOTE_LENGTH}자
               </span>
-              <input
-                type="file"
-                accept="image/*"
-                className="sr-only"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-
-                  if (!file) {
-                    return;
-                  }
-
-                  setCompressing(true);
-
-                  try {
-                    const compressedFile = await compressImage(file);
-
-                    if (compressedFile.size > MAX_UPLOAD_BYTES) {
-                      alert(
-                        `사진 용량이 너무 커요. 현재 ${formatFileSize(compressedFile.size)}라서 4MB 이하 사진으로 다시 선택해주세요.`
-                      );
-                      e.target.value = '';
-                      setImageFile(null);
-                      return;
-                    }
-
-                    setImageFile(compressedFile);
-                  } catch {
-                    alert('사진 최적화에 실패했어요. 다른 사진으로 다시 시도해주세요.');
-                    e.target.value = '';
-                    setImageFile(null);
-                  } finally {
-                    setCompressing(false);
-                  }
-                }}
-                required
-              />
             </label>
+
+            <PetPhotoPicker
+              label="사진 등록"
+              required
+              emptyText="사진 선택 후 영역 고르기"
+              helperText="선택 후 원하는 영역을 직접 맞춘 뒤 업로드됩니다"
+              hintText="정사각형 기준으로 저장돼요."
+              value={imageFile}
+              onChange={setImageFile}
+              onProcessingChange={setProcessingImage}
+            />
 
             <div className="rounded-2xl border border-[#eee8dc] bg-[#fffdf8] p-4">
               <div className="flex items-start justify-between gap-3">
@@ -440,7 +438,7 @@ export default function RegisterPage() {
             </div>
 
             <button
-              disabled={loading || compressing || !privacyAgreed}
+              disabled={loading || processingImage || !privacyAgreed}
               className="mt-3 h-13 w-full rounded-xl bg-[#ffd766] px-5 text-sm font-black text-[#211a0c] shadow-[0_10px_24px_rgba(229,173,36,0.28)] transition hover:bg-[#ffcc3d] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? '생성 중...' : 'QR 코드 생성하기  🐾'}

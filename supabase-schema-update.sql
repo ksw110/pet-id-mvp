@@ -7,6 +7,8 @@ create table if not exists registration_codes (
 
 alter table pets
 add column if not exists emergency_phone text,
+add column if not exists gender text,
+add column if not exists birth_year integer,
 add column if not exists animal_registration_number text,
 add column if not exists qr_image_url text,
 add column if not exists registration_code text unique,
