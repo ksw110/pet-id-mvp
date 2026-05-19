@@ -2,9 +2,12 @@ import { NextResponse } from 'next/server';
 import { customAlphabet } from 'nanoid';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
+// 등록코드를 새로 만드는 API입니다.
+// 사용자가 직접 코드를 넣지 않으면 nanoid로 자동 생성합니다.
 const createCodeSuffix = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 8);
 
 function normalizeCode(code: string) {
+  // 공백이나 소문자 등 입력 흔들림을 줄여 중복 충돌 가능성을 낮춥니다.
   return code.trim().toUpperCase().replace(/\s+/g, '-');
 }
 

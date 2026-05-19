@@ -3,11 +3,16 @@ import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import LocationShareButton from './LocationShareButton';
 
+// 이 페이지는 /pet/[id] 형태의 동적 라우트입니다.
+// URL의 id 값에 맞는 반려견 한 마리를 조회해서 공개용 상세 페이지를 렌더링합니다.
 type Props = {
+  // 이 params.id는 URL의 /pet/[id] 에서 [id] 자리에 들어온 값입니다.
   params: Promise<{ id: string }>;
 };
 
 function getGenderLabel(gender: string | null) {
+  // DB에는 male/female처럼 저장하지만,
+  // 화면에는 사람이 읽기 쉬운 한글로 바꿔 보여줍니다.
   if (gender === 'male') {
     return '남아';
   }
@@ -20,6 +25,7 @@ function getGenderLabel(gender: string | null) {
 }
 
 function getAgeLabel(birthYear: number | null) {
+  // birthYear가 있으면 현재 연도 기준으로 나이를 계산해 "3살"처럼 보여줍니다.
   if (!birthYear) {
     return '';
   }
@@ -34,18 +40,24 @@ function getAgeLabel(birthYear: number | null) {
 }
 
 export default async function Page({ params }: Props) {
+  // App Router의 동적 params는 비동기 값으로 전달될 수 있습니다.
   const { id } = await params;
 
+  // 서버 컴포넌트이므로 브라우저를 거치지 않고 바로 DB 조회를 수행할 수 있습니다.
   const { data, error } = await supabase
     .from('pets')
     .select('*')
     .eq('id', id)
     .single();
 
+  // notFound()를 호출하면 Next.js가 404 페이지 흐름으로 전환합니다.
   if (error || !data) return notFound();
 
   const genderLabel = getGenderLabel(data.gender);
   const ageLabel = getAgeLabel(data.birth_year);
+
+  // genderLabel / ageLabel은 "화면 표시용 가공 데이터"입니다.
+  // DB 원본값을 그대로 쓰기보다, JSX가 읽기 쉽게 미리 변환해둔 값입니다.
 
   return (
     <main className="min-h-screen bg-[#fbfaf7] px-4 py-5 text-[#171717] sm:px-6 sm:py-10">
@@ -53,6 +65,7 @@ export default async function Page({ params }: Props) {
         <div className="relative aspect-[4/3] w-full overflow-hidden bg-[#f6f0e8]">
           {data.image_url ? (
             <>
+              {/* 첫 번째 이미지는 흐린 배경층, 두 번째 이미지는 실제 선명한 메인 사진입니다. */}
               <Image
                 src={data.image_url}
                 alt=""
@@ -92,6 +105,7 @@ export default async function Page({ params }: Props) {
             {data.pet_name} <span className="text-[#b98242]">🐾</span>
           </h1>
 
+          {/* dl / dt / dd는 "항목 이름 - 값" 구조를 표현하는 HTML 태그입니다. */}
           <dl className="space-y-5 text-[15px]">
               {genderLabel && (
                 <div className="grid grid-cols-[28px_88px_1fr] items-start gap-2">

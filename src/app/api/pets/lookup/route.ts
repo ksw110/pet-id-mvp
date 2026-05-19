@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
+// 고객 ID로 공개 URL을 찾는 간단한 조회 API입니다.
 export async function POST(req: Request) {
   const supabaseAdmin = getSupabaseAdmin();
   const { user_id } = await req.json();

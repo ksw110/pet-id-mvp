@@ -3,22 +3,49 @@
 import Link from 'next/link';
 import { useState } from 'react';
 
+// 홈 화면은 사용자가 가장 먼저 보는 안내 페이지이자,
+// "고객 ID로 공개 URL 찾기" 기능도 함께 담당합니다.
 export default function HomePage() {
+  // lookupUserId:
+  // 사용자가 입력창에 적는 "고객 ID" 문자열입니다.
+  // 이 값은 사용자가 타이핑할 때마다 바뀌고, 조회 버튼을 누르면
+  // `/api/pets/lookup`으로 보내집니다.
   const [lookupUserId, setLookupUserId] = useState('');
+
+  // lookupLoading:
+  // 지금 URL 조회 요청이 진행 중인지 나타냅니다.
+  // true면 버튼 글자를 "조회 중..."으로 바꾸고, 중복 클릭을 막는 데 쓸 수 있습니다.
   const [lookupLoading, setLookupLoading] = useState(false);
+
+  // lookupMessage:
+  // 성공/실패 안내 문구를 저장합니다.
+  // 예를 들면 "등록된 URL을 찾았어요." 같은 사용자용 문장이 들어갑니다.
   const [lookupMessage, setLookupMessage] = useState('');
+
+  // lookupResult:
+  // 서버가 실제로 돌려준 결과 데이터를 저장합니다.
+  // 이 값이 있어야 "어떤 반려견의 URL인지" 화면에 같이 보여줄 수 있습니다.
   const [lookupResult, setLookupResult] = useState<{
     pet_name: string;
     url: string;
   } | null>(null);
 
   async function handleLookup(e: React.FormEvent<HTMLFormElement>) {
+    // form submit의 기본 동작(브라우저 새로고침)을 막고
+    // React 안에서 비동기 요청으로 처리합니다.
     e.preventDefault();
     setLookupLoading(true);
     setLookupMessage('');
     setLookupResult(null);
 
     try {
+      // 브라우저에서 같은 프로젝트의 API Route를 호출하는 형태입니다.
+      // 여기서 보내는 데이터:
+      // - user_id: 사용자가 입력한 고객 ID
+      //
+      // 여기서 기대하는 응답:
+      // - pet_name: 반려견 이름
+      // - url: 공개 상세 페이지 URL
       const res = await fetch('/api/pets/lookup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -29,10 +56,15 @@ export default function HomePage() {
       const data = await res.json();
 
       if (!res.ok) {
+        // 서버가 200번대가 아닌 응답을 주면 "실패"로 간주합니다.
+        // 예: 해당 ID가 DB에 없을 때
         setLookupMessage(data.error || 'URL을 찾을 수 없습니다.');
         return;
       }
 
+      // 성공하면 "메시지"와 "실제 결과 데이터"를 따로 저장합니다.
+      // 메시지는 사람이 읽는 문장,
+      // lookupResult는 JSX가 실제 값을 출력할 때 쓰는 데이터라고 생각하면 됩니다.
       setLookupResult(data);
       setLookupMessage('등록된 URL을 찾았어요.');
     } catch {
@@ -137,6 +169,8 @@ export default function HomePage() {
               ['02', '반려견 정보 등록'],
               ['03', '고객 ID로 URL 조회'],
             ].map(([step, title]) => (
+              // React에서 배열을 화면으로 그릴 때는 key가 필요합니다.
+              // key는 같은 항목을 React가 다시 식별할 수 있게 도와줍니다.
               <div key={step} className="rounded-2xl border border-[#eee8dc] bg-white/80 p-4">
                 <p className="text-xs font-black text-[#d69b14]">{step}</p>
                 <p className="mt-2 text-sm font-black">{title}</p>

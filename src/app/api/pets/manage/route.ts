@@ -2,11 +2,26 @@ import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { hashPetPassword } from '@/lib/pet-password';
 
+// 수정 페이지 로그인용 API입니다.
+// 고객 ID와 비밀번호를 확인한 뒤, 수정 폼에 채울 반려견 정보를 돌려줍니다.
 export async function POST(req: Request) {
   try {
     const supabaseAdmin = getSupabaseAdmin();
+
+    // 클라이언트가 보내는 JSON 예시:
+    // {
+    //   user_id: "meonggrey01",
+    //   password: "123456"
+    // }
     const { user_id, password } = await req.json();
+
+    // normalizedUserId:
+    // 사용자가 대문자/공백을 섞어 입력해도 같은 ID로 취급되게 정리한 값입니다.
     const normalizedUserId = String(user_id || '').trim().toLowerCase();
+
+    // plainPassword:
+    // 사용자가 입력한 원문 비밀번호입니다.
+    // DB에는 원문이 없으므로 아래에서 해시로 바꿔 비교합니다.
     const plainPassword = String(password || '');
 
     if (!normalizedUserId || !plainPassword) {
@@ -22,6 +37,8 @@ export async function POST(req: Request) {
       .eq('user_id', normalizedUserId)
       .single();
 
+    // 저장된 비밀번호 원문은 DB에 없으므로,
+    // 사용자가 입력한 비밀번호를 같은 규칙으로 다시 해시해서 비교합니다.
     const passwordHash = data ? hashPetPassword(plainPassword, data.registration_code) : '';
 
     if (error || !data || data.password_hash !== passwordHash) {
@@ -32,6 +49,8 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({
+      // 이 응답 객체는 edit/page.tsx가 그대로 받아서
+      // 수정 입력칸의 기본값으로 사용합니다.
       pet: {
         id: data.id,
         registration_code: data.registration_code,

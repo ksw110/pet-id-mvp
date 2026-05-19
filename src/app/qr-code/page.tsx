@@ -3,6 +3,8 @@
 import Image from 'next/image';
 import { useState } from 'react';
 
+// 관리자용 QR 조회 페이지입니다.
+// 먼저 관리자 비밀번호로 잠금을 풀고, 그 다음 연락처로 QR 이미지를 찾습니다.
 type PetQr = {
   id: string;
   pet_name: string;
@@ -25,16 +27,35 @@ function formatPhoneNumber(value: string) {
 }
 
 export default function QrCodeLookupPage() {
+  // adminPassword:
+  // 관리자 잠금을 풀 때 쓰는 비밀번호 입력값입니다.
   const [adminPassword, setAdminPassword] = useState('');
+
+  // adminUnlocked:
+  // 관리자 인증이 끝났는지 여부입니다.
+  // false면 비밀번호 입력 화면, true면 실제 조회 화면이 보입니다.
   const [adminUnlocked, setAdminUnlocked] = useState(false);
+
+  // phone:
+  // 조회 기준이 되는 보호자 연락처입니다.
   const [phone, setPhone] = useState('');
+
+  // pets:
+  // 조회 결과로 나온 QR 목록입니다.
   const [pets, setPets] = useState<PetQr[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // searched:
+  // "한 번도 조회 안 한 상태"와 "조회했는데 결과가 0개인 상태"를 구분하기 위해 둡니다.
   const [searched, setSearched] = useState(false);
+
+  // error:
+  // 에러 메시지를 저장해서 화면에 박스로 보여줍니다.
   const [error, setError] = useState('');
 
   async function downloadQrImage(url: string, fileName: string) {
     try {
+      // 이미지를 blob으로 받아 임시 URL을 만들고, 가짜 <a> 클릭으로 다운로드를 유도합니다.
       const res = await fetch(url);
       const blob = await res.blob();
       const objectUrl = URL.createObjectURL(blob);
@@ -79,6 +100,7 @@ export default function QrCodeLookupPage() {
   }
 
   async function handleUnlock(e: React.FormEvent<HTMLFormElement>) {
+    // 관리자 비밀번호 확인은 별도의 API로 분리해 두었습니다.
     e.preventDefault();
     setLoading(true);
     setError('');

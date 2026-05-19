@@ -6,6 +6,9 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import PetPhotoPicker from '@/components/PetPhotoPicker';
 
+// 수정 페이지는 2단계 흐름입니다.
+// 1) 고객 ID/비밀번호로 기존 데이터를 불러오고
+// 2) 불러온 값을 수정해서 다시 저장합니다.
 const MAX_PET_NAME_LENGTH = 20;
 const MAX_OWNER_NAME_LENGTH = 20;
 const MAX_LOCATION_LENGTH = 50;
@@ -58,16 +61,42 @@ function getAgeFromBirthYear(birthYear: string) {
 }
 
 export default function EditPage() {
+  // useRouter는 코드 안에서 페이지 이동을 하고 싶을 때 사용합니다.
   const router = useRouter();
+
+  // credentials:
+  // 수정 페이지에 들어오기 위한 로그인 정보입니다.
+  // 먼저 이 값으로 `/api/pets/manage`를 호출해서 본인 확인을 합니다.
   const [credentials, setCredentials] = useState({
     user_id: '',
     password: '',
   });
+
+  // form:
+  // 로그인 성공 후 서버가 돌려준 기존 반려견 정보를 담습니다.
+  // 처음에는 null이라서 "로그인 폼"을 보여주고,
+  // 값이 들어오면 "수정 폼"을 보여주는 방식입니다.
   const [form, setForm] = useState<PetForm | null>(null);
+
+  // imageFile:
+  // 새 사진으로 교체하고 싶을 때만 들어오는 파일입니다.
+  // 사용자가 새로 선택하지 않으면 null 상태를 유지하고, 서버도 기존 사진을 그대로 둡니다.
   const [imageFile, setImageFile] = useState<File | null>(null);
+
+  // loading:
+  // 로그인 / 저장 / 비밀번호 변경 요청 중인지 나타내는 공통 로딩 상태입니다.
   const [loading, setLoading] = useState(false);
+
+  // processingImage:
+  // PetPhotoPicker 내부에서 새 이미지를 준비하는 중인지 나타냅니다.
   const [processingImage, setProcessingImage] = useState(false);
+
+  // message:
+  // 사용자에게 보여줄 성공/실패 안내 문구입니다.
   const [message, setMessage] = useState('');
+
+  // passwordForm:
+  // "정보 수정"과는 별개로 비밀번호 변경 전용 폼 상태입니다.
   const [passwordForm, setPasswordForm] = useState({
     new_password: '',
     confirm_password: '',
@@ -79,11 +108,21 @@ export default function EditPage() {
     passwordForm.new_password === passwordForm.confirm_password;
 
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
+    // 수정 전 먼저 인증을 받아, 이 사람이 실제 보호자인지 확인합니다.
     e.preventDefault();
     setLoading(true);
     setMessage('');
 
     try {
+      // 보내는 곳:
+      // - `/api/pets/manage`
+      //
+      // 보내는 값:
+      // - user_id
+      // - password
+      //
+      // 받는 값:
+      // - pet: 수정 폼에 채울 기존 데이터
       const res = await fetch('/api/pets/manage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -99,7 +138,10 @@ export default function EditPage() {
         return;
       }
 
+      // 서버에서 받은 데이터를 입력 폼이 바로 사용할 수 있는 형태로 옮깁니다.
       setForm({
+        // 서버에서 받은 응답을 그대로 쓰기보다,
+        // 입력창이 다루기 편한 문자열 형태로 한 번 정리해서 넣습니다.
         user_id: data.pet.user_id || '',
         pet_name: data.pet.pet_name || '',
         owner_name: data.pet.owner_name || '',
@@ -132,6 +174,16 @@ export default function EditPage() {
     try {
       const formData = new FormData();
 
+      // PATCH 요청에도 파일이 섞여 있으므로 JSON 대신 FormData를 사용합니다.
+      //
+      // current_user_id:
+      // 지금 로그인한 사용자가 누구인지 서버가 다시 확인할 때 사용
+      //
+      // user_id:
+      // 현재 저장하려는 고객 ID
+      //
+      // password:
+      // 수정 권한 확인용 비밀번호
       Object.entries({
         ...form,
         current_user_id: credentials.user_id.trim().toLowerCase(),
@@ -142,9 +194,19 @@ export default function EditPage() {
       });
 
       if (imageFile) {
+        // 새 사진이 있을 때만 서버에 전송합니다.
         formData.append('image_file', imageFile);
       }
 
+      // 보내는 곳:
+      // - `/api/pets`
+      //
+      // 메서드:
+      // - PATCH
+      //
+      // 받는 값:
+      // - 수정된 image_url
+      // - 공개 URL 등
       const res = await fetch('/api/pets', {
         method: 'PATCH',
         body: formData,
@@ -160,6 +222,7 @@ export default function EditPage() {
       setCredentials({ ...credentials, user_id: form.user_id.trim().toLowerCase() });
       setImageFile(null);
       alert('수정이 완료됐어요.');
+      // 저장 후 홈으로 보내는 것은 "수정 완료" 흐름을 단순하게 유지하기 위한 UX 선택입니다.
       router.push('/');
     } catch {
       setMessage('수정 저장 중 오류가 발생했어요.');
@@ -169,6 +232,8 @@ export default function EditPage() {
   }
 
   async function handlePasswordChange(e: React.FormEvent<HTMLFormElement>) {
+    // 비밀번호 변경은 정보 수정과 별도 요청으로 분리했습니다.
+    // 이렇게 나누면 실패 원인을 더 명확하게 보여줄 수 있습니다.
     e.preventDefault();
     setLoading(true);
     setMessage('');
@@ -186,6 +251,14 @@ export default function EditPage() {
     }
 
     try {
+      // 보내는 곳:
+      // - `/api/pets/password`
+      //
+      // 메서드:
+      // - PATCH
+      //
+      // 목적:
+      // - 현재 비밀번호가 맞는지 확인한 뒤 새 비밀번호로 교체
       const res = await fetch('/api/pets/password', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },

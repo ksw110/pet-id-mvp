@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+// 여러 관리자 화면에서 공통으로 쓰는 "관리자 비밀번호 검증" API입니다.
 export async function POST(req: Request) {
   const { password } = await req.json();
   const adminPassword = process.env.QR_ADMIN_PASSWORD;

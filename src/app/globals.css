@@ -1,10 +1,12 @@
 @import "tailwindcss";
 
+/* 앱 전체에서 재사용할 기본 색상 변수입니다. */
 :root {
   --background: #ffffff;
   --foreground: #171717;
 }
 
+/* Tailwind v4에서 CSS 변수를 테마 토큰처럼 연결하는 부분입니다. */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -12,6 +14,7 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* 시스템이 다크 모드일 때 색상 변수를 바꿉니다. */
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
@@ -19,6 +22,7 @@
   }
 }
 
+/* body는 모든 페이지의 가장 바깥 요소라서, 기본 배경/글자색/폰트를 여기서 통일합니다. */
 body {
   background: var(--background);
   color: var(--foreground);

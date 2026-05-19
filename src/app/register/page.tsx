@@ -6,6 +6,8 @@ import Image from 'next/image';
 import PetPhotoPicker from '@/components/PetPhotoPicker';
 import PrivacyPolicyContent from '../privacy/PrivacyPolicyContent';
 
+// 이 파일은 반려견 정보를 처음 등록하는 페이지입니다.
+// React 초심자 관점에서 보면 "긴 입력 폼 + 검증 + API 호출 + 성공 결과 표시" 예제라고 볼 수 있습니다.
 const MAX_PET_NAME_LENGTH = 20;
 const MAX_OWNER_NAME_LENGTH = 20;
 const MAX_LOCATION_LENGTH = 50;
@@ -17,6 +19,7 @@ const GENDER_OPTIONS = [
 ] as const;
 
 function formatPhoneNumber(value: string) {
+  // 사용자가 숫자만 입력해도 자동으로 010-1234-5678 형태에 가깝게 맞춰줍니다.
   const numbers = value.replace(/\D/g, '').slice(0, 11);
 
   if (numbers.length <= 3) {
@@ -35,6 +38,7 @@ function getCurrentYear() {
 }
 
 function getAgeFromBirthYear(birthYear: string) {
+  // 입력값은 문자열이므로 먼저 "정말 4자리 연도인가?"를 검사합니다.
   if (!/^\d{4}$/.test(birthYear)) {
     return '';
   }
@@ -44,6 +48,7 @@ function getAgeFromBirthYear(birthYear: string) {
 }
 
 async function readJsonResponse(res: Response) {
+  // 어떤 API는 에러 상황에서 JSON이 아닐 수도 있으므로 안전하게 감쌉니다.
   try {
     return await res.json();
   } catch {
@@ -52,33 +57,110 @@ async function readJsonResponse(res: Response) {
 }
 
 export default function RegisterPage() {
+  // 관련 있는 입력값을 하나의 객체 state로 묶으면
+  // form 전체를 다루기 쉽고, 제출 시에도 그대로 FormData로 옮기기 편합니다.
   const [form, setForm] = useState({
+    // registration_code:
+    // 판매자/관리자가 미리 발급해준 등록코드입니다.
+    // 등록 전에 유효한 코드인지 서버에서 먼저 검사합니다.
     registration_code: '',
+
+    // user_id:
+    // 사용자가 나중에 수정 페이지 로그인에 쓸 "고객 ID"입니다.
+    // 중복되면 안 되기 때문에 별도 중복 확인 API를 호출합니다.
     user_id: '',
+
+    // password / password_confirm:
+    // 수정 페이지 로그인에 쓸 비밀번호와 비밀번호 확인 값입니다.
+    // password_confirm는 DB에 저장하려는 값이 아니라,
+    // 사용자가 비밀번호를 잘못 입력하지 않았는지 확인하기 위한 보조 입력입니다.
     password: '',
     password_confirm: '',
+
+    // pet_name:
+    // 공개 상세 페이지에서 크게 보여줄 반려견 이름입니다.
     pet_name: '',
+
+    // owner_name:
+    // 보호자 이름입니다.
     owner_name: '',
+
+    // phone:
+    // 가장 중요한 보호자 연락처입니다.
+    // 공개 페이지와 전화 버튼에서 사용됩니다.
     phone: '',
+
+    // emergency_phone:
+    // 추가 연락처가 있을 때만 입력하는 선택값입니다.
     emergency_phone: '',
+
+    // gender / birth_year:
+    // 상세 페이지에 성별과 나이를 표시하기 위한 선택 입력값입니다.
     gender: '',
     birth_year: '',
+
+    // animal_registration_number:
+    // 국가 동물등록번호 같은 추가 식별값입니다.
     animal_registration_number: '',
+
+    // emergency_note:
+    // 성격, 주의사항, 질병 같은 메모를 적는 칸입니다.
     emergency_note: '',
+
+    // location:
+    // 활동 지역을 적는 칸입니다.
     location: '',
   });
 
+  // imageFile:
+  // 사용자가 최종적으로 선택하고 크롭까지 끝낸 업로드용 파일입니다.
+  // 이 값은 submit 시 FormData에 `image_file`이라는 이름으로 서버에 전송됩니다.
   const [imageFile, setImageFile] = useState<File | null>(null);
+
+  // qrImage:
+  // 등록 성공 후 서버가 생성해준 QR 이미지 URL입니다.
+  // 등록 결과 화면에서 미리보기로 사용됩니다.
   const [qrImage, setQrImage] = useState('');
+
+  // resultUrl:
+  // 등록 성공 후 만들어진 공개 상세 페이지 URL입니다.
   const [resultUrl, setResultUrl] = useState('');
+
+  // loading:
+  // 등록 요청 전체가 진행 중인지 나타냅니다.
   const [loading, setLoading] = useState(false);
+
+  // processingImage:
+  // 사진 크롭/준비 작업이 끝났는지 나타냅니다.
+  // true일 때는 아직 업로드할 파일이 완전히 준비되지 않았다고 보면 됩니다.
   const [processingImage, setProcessingImage] = useState(false);
+
+  // privacyAgreed:
+  // 개인정보 동의 체크박스 값입니다.
   const [privacyAgreed, setPrivacyAgreed] = useState(false);
+
+  // privacyModalOpen:
+  // 개인정보 처리방침 모달을 열었는지 여부입니다.
   const [privacyModalOpen, setPrivacyModalOpen] = useState(false);
+
+  // submitMessage:
+  // 등록 과정에서 생긴 성공/실패 메시지를 저장합니다.
   const [submitMessage, setSubmitMessage] = useState('');
+
+  // checkingUserId:
+  // 중복 확인 API가 진행 중인지 나타냅니다.
   const [checkingUserId, setCheckingUserId] = useState(false);
+
+  // userIdChecked:
+  // "중복 확인 버튼을 한 번이라도 눌렀는가?"를 뜻합니다.
+  // 그냥 입력만 하고 넘어가는 걸 막기 위해 따로 상태를 둡니다.
   const [userIdChecked, setUserIdChecked] = useState(false);
+
+  // userIdAvailable:
+  // 서버 응답 기준으로 사용 가능한 ID인지 여부입니다.
   const [userIdAvailable, setUserIdAvailable] = useState(false);
+  // 파생값(derived state)은 별도 useState가 아니라 현재 값으로부터 계산하면
+  // 상태 동기화 버그를 줄일 수 있습니다.
   const hasPasswordConfirmation = form.password_confirm.length > 0;
   const passwordsMatch =
     hasPasswordConfirmation && form.password.length >= 6 && form.password === form.password_confirm;
@@ -92,6 +174,17 @@ export default function RegisterPage() {
     setCheckingUserId(true);
 
     try {
+      // 회원가입/등록 폼에서 흔한 "중복 확인" 흐름입니다.
+      // 버튼 클릭 시 전용 API로 user_id 사용 가능 여부를 검사합니다.
+      //
+      // 보내는 곳:
+      // - `/api/pets/user-id`
+      //
+      // 보내는 값:
+      // - { user_id: form.user_id }
+      //
+      // 받는 값:
+      // - { available: true | false }
       const res = await fetch('/api/pets/user-id', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -126,6 +219,8 @@ export default function RegisterPage() {
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    // submit은 전체 폼의 마지막 진입점입니다.
+    // 보통 "기본 검증 -> 서버 검증 -> 실제 저장" 순서로 읽으면 이해하기 쉽습니다.
     e.preventDefault();
     setLoading(true);
     setSubmitMessage('');
@@ -133,6 +228,9 @@ export default function RegisterPage() {
     try {
       const registrationCode = form.registration_code.trim().toUpperCase();
 
+      // 1. 프론트에서 먼저 아주 기본적인 빈칸/길이 검사를 합니다.
+      // 2. 그 다음 서버에 등록코드 검증 요청을 보냅니다.
+      // 3. 마지막으로 실제 등록 API에 FormData를 전송합니다.
       if (!registrationCode || !form.user_id || !form.password) {
         alert('등록코드, 고객 ID, 비밀번호를 입력해주세요.');
         return;
@@ -161,6 +259,8 @@ export default function RegisterPage() {
       const codeValidationData = await readJsonResponse(codeValidationRes);
 
       if (!codeValidationRes.ok) {
+        // 등록코드는 "존재하지 않음" 또는 "이미 사용됨"일 수 있습니다.
+        // 이 에러 메시지는 서버가 상황에 맞게 만들어서 보내줍니다.
         const errorMessage = codeValidationData?.error || '등록코드를 확인할 수 없습니다.';
         setSubmitMessage(errorMessage);
         alert(errorMessage);
@@ -169,6 +269,8 @@ export default function RegisterPage() {
 
       const formData = new FormData();
 
+      // 문자열 입력값은 FormData에 차례대로 담고,
+      // 파일은 아래에서 별도로 append합니다.
       Object.entries({
         ...form,
         registration_code: registrationCode,
@@ -177,10 +279,20 @@ export default function RegisterPage() {
       });
 
       if (imageFile) {
+        // 서버의 `/api/pets`는 `image_file`이라는 key 이름으로 파일을 받습니다.
         formData.append('image_file', imageFile);
       }
 
-      // 📡 API 호출
+      // 등록 API는 multipart/form-data를 받기 때문에
+      // JSON이 아니라 FormData를 body로 그대로 보냅니다.
+      //
+      // 보내는 곳:
+      // - `/api/pets`
+      //
+      // 받는 값:
+      // - id
+      // - url
+      // - qr_image_url
       const res = await fetch('/api/pets', {
         method: 'POST',
         body: formData,
@@ -196,12 +308,18 @@ export default function RegisterPage() {
       }
 
       if (!data?.url) {
+        // 등록은 성공했는데 URL이 없다면 화면에서 결과를 이어갈 수 없으므로
+        // 예외로 처리합니다.
         throw new Error('QR 생성 결과를 불러오지 못했어요.');
       }
 
       setQrImage(data.qr_image_url || '');
       setResultUrl(data.url);
       setSubmitMessage('QR 코드가 생성됐어요.');
+
+      // 결과 섹션은 폼 아래쪽에 있어서, 등록 직후 사용자가 못 보고 지나칠 수 있습니다.
+      // 그래서 성공하면 결과 영역으로 자동 스크롤합니다.
+      // 결과를 바로 볼 수 있게 성공 후 특정 영역으로 스크롤합니다.
       window.setTimeout(() => {
         document.getElementById('qr-result')?.scrollIntoView({
           behavior: 'smooth',
@@ -209,6 +327,7 @@ export default function RegisterPage() {
         });
       }, 100);
     } catch (error) {
+      // try 블록 안에서 throw된 에러와 네트워크 오류가 여기로 옵니다.
       const errorMessage =
         error instanceof Error
           ? error.message

@@ -3,6 +3,8 @@
 import Image from 'next/image';
 import { useState } from 'react';
 
+// 이 페이지는 여러 관리자 기능을 하나로 모은 대시보드입니다.
+// 탭으로 기능을 나눠서 "한 화면에 너무 많은 폼"이 보이지 않게 했습니다.
 type CreatedCode = {
   code: string;
   created_at: string;
@@ -30,15 +32,43 @@ function formatPhoneNumber(value: string) {
 }
 
 export default function AdminPage() {
+  // adminPassword / adminUnlocked:
+  // 관리자용 여러 기능을 보호하기 위한 첫 번째 잠금 장치입니다.
   const [adminPassword, setAdminPassword] = useState('');
   const [adminUnlocked, setAdminUnlocked] = useState(false);
+
+  // activeTab:
+  // 현재 어떤 관리자 기능 탭을 보고 있는지 저장합니다.
+  // 'codes' | 'password' | 'qr' 중 하나만 들어갑니다.
   const [activeTab, setActiveTab] = useState<'codes' | 'password' | 'qr'>('codes');
+
+  // customCode:
+  // 등록코드 생성 탭에서 사용자가 직접 입력하는 코드
   const [customCode, setCustomCode] = useState('');
+
+  // resetCode:
+  // 임시 비밀번호 발급 대상 등록코드
   const [resetCode, setResetCode] = useState('');
+
+  // temporaryPassword:
+  // 서버가 발급한 임시 비밀번호 결과값
   const [temporaryPassword, setTemporaryPassword] = useState('');
+
+  // phone:
+  // QR 조회 탭에서 검색 기준으로 쓰는 연락처
   const [phone, setPhone] = useState('');
+
+  // pets:
+  // QR 조회 결과 목록
   const [pets, setPets] = useState<PetQr[]>([]);
+
+  // createdCodes:
+  // 등록코드 생성 탭에서 새로 만든 코드 목록
   const [createdCodes, setCreatedCodes] = useState<CreatedCode[]>([]);
+
+  // searched:
+  // QR 조회를 실제로 눌렀는지 여부를 기억해서
+  // "아직 조회 안 함"과 "조회했지만 결과 없음"을 구분합니다.
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -227,6 +257,7 @@ export default function AdminPage() {
                 ['password', '비밀번호'],
                 ['qr', 'QR 조회'],
               ].map(([id, label]) => (
+                // activeTab 값이 바뀌면 아래 조건부 렌더링도 함께 바뀝니다.
                 <button
                   key={id}
                   type="button"

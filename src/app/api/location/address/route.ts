@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+// 이 API는 위도/경도를 받아 사람이 읽을 수 있는 주소 문자열로 바꿔줍니다.
+// 외부 카카오 API를 감싼 "중간 서버" 역할이라고 생각하면 이해하기 쉽습니다.
 type KakaoAddressDocument = {
   address?: {
     address_name?: string;
@@ -50,6 +52,8 @@ export async function GET(req: Request) {
     );
   }
 
+  // road_address가 있으면 도로명 주소를 우선 사용하고,
+  // 없으면 일반 지번 주소로 fallback합니다.
   const data = (await kakaoRes.json()) as KakaoAddressResponse;
   const address = data.documents?.[0]?.road_address?.address_name
     || data.documents?.[0]?.address?.address_name

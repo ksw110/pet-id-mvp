@@ -1,5 +1,6 @@
 import PrivacyPolicyContent from './PrivacyPolicyContent';
 
+// 개인정보 처리방침 페이지는 본문 컴포넌트를 분리해 재사용성과 가독성을 높였습니다.
 export default function PrivacyPage() {
   return (
     <main className="min-h-screen bg-[#fbfaf7] px-4 py-6 text-[#171717] sm:px-6 sm:py-10">

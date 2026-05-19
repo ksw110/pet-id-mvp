@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
+// layout.tsx는 App Router의 "공통 껍데기"입니다.
+// 여기서 설정한 폰트, 메타데이터, html/body 구조가 모든 페이지에 공통 적용됩니다.
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -27,6 +29,7 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      {/* children 자리에 각 페이지(`page.tsx`)의 실제 내용이 끼워집니다. */}
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

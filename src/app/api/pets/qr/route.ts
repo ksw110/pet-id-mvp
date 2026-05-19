@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+// 연락처로 저장된 QR 이미지를 찾는 관리자용 조회 API입니다.
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const phone = searchParams.get('phone')?.trim();

@@ -2,16 +2,22 @@
 
 import { useState } from 'react';
 
+// 공개 상세 페이지에서 현재 위치를 보호자에게 문자로 보내는 버튼입니다.
+// 브라우저의 Geolocation API와 우리 서버의 주소 변환 API를 함께 사용합니다.
 type LocationShareButtonProps = {
   petName: string;
   phone: string;
 };
 
 export default function LocationShareButton({ petName, phone }: LocationShareButtonProps) {
+  // loading:
+  // 현재 위치를 읽고 문자 앱으로 넘길 준비를 하는 중인지 나타냅니다.
   const [loading, setLoading] = useState(false);
 
   async function getAddress(latitude: number, longitude: number) {
     try {
+      // 좌표를 그대로 보내면 사람이 읽기 어렵기 때문에
+      // 서버 API를 통해 "주소 문자열"로 바꿉니다.
       const res = await fetch(`/api/location/address?lat=${latitude}&lng=${longitude}`);
 
       if (!res.ok) {
@@ -26,6 +32,7 @@ export default function LocationShareButton({ petName, phone }: LocationShareBut
   }
 
   function handleShareLocation() {
+    // navigator.geolocation은 브라우저 기능이므로 클라이언트 컴포넌트에서만 쓸 수 있습니다.
     if (!navigator.geolocation) {
       alert('현재 브라우저에서는 위치 공유를 지원하지 않아요.');
       return;
@@ -45,9 +52,16 @@ export default function LocationShareButton({ petName, phone }: LocationShareBut
       async (position) => {
         const { latitude, longitude } = position.coords;
         const address = await getAddress(latitude, longitude);
+        // 문자 앱으로 넘길 메시지를 만들고, sms: 링크로 이동합니다.
+
+        // mapUrl:
+        // 보호자가 눌렀을 때 바로 지도에서 위치를 볼 수 있도록 만드는 링크입니다.
         const mapUrl = address
           ? `https://map.kakao.com/link/map/${encodeURIComponent(address)},${latitude},${longitude}`
           : `https://map.kakao.com/link/map/${latitude},${longitude}`;
+
+        // message:
+        // 실제로 문자 앱 body에 들어갈 최종 문자열입니다.
         const locationText = address ? `현재 위치: ${address}\n` : '';
         const message = `${petName}를 발견했어요.\n${locationText}카카오맵에서 위치를 확인해주세요: ${mapUrl}`;
 

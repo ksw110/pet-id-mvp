@@ -2,17 +2,32 @@
 
 import { useState } from 'react';
 
+// 등록코드 생성과 임시 비밀번호 발급을 각각 폼으로 분리한 관리자 페이지입니다.
 type CreatedCode = {
   code: string;
   created_at: string;
 };
 
 export default function RegistrationCodesPage() {
+  // adminPassword / adminUnlocked:
+  // 이 페이지도 관리자 인증을 먼저 통과해야 실제 기능을 볼 수 있습니다.
   const [adminPassword, setAdminPassword] = useState('');
   const [adminUnlocked, setAdminUnlocked] = useState(false);
+
+  // customCode:
+  // 관리자가 직접 원하는 등록코드를 입력하고 싶을 때 사용하는 값입니다.
   const [customCode, setCustomCode] = useState('');
+
+  // resetCode:
+  // 임시 비밀번호 발급 시 기준이 되는 등록코드입니다.
   const [resetCode, setResetCode] = useState('');
+
+  // temporaryPassword:
+  // 서버가 새로 만들어준 임시 비밀번호를 보여주기 위한 상태입니다.
   const [temporaryPassword, setTemporaryPassword] = useState('');
+
+  // createdCodes:
+  // 이 화면에서 방금 생성한 등록코드를 바로 리스트로 보여주기 위한 상태입니다.
   const [createdCodes, setCreatedCodes] = useState<CreatedCode[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -64,6 +79,7 @@ export default function RegistrationCodesPage() {
         return;
       }
 
+      // 새 코드를 목록 맨 앞에 추가하면 방금 만든 결과를 즉시 확인할 수 있습니다.
       setCreatedCodes((prev) => [data, ...prev]);
       setCustomCode('');
     } catch {
@@ -74,11 +90,13 @@ export default function RegistrationCodesPage() {
   }
 
   async function copyCode(code: string) {
+    // 최신 브라우저에서는 clipboard API로 텍스트를 쉽게 복사할 수 있습니다.
     await navigator.clipboard.writeText(code);
     alert('등록코드를 복사했어요.');
   }
 
   async function handleResetPassword(e: React.FormEvent<HTMLFormElement>) {
+    // 등록코드를 알고 있는 관리자만 임시 비밀번호를 발급하도록 만든 흐름입니다.
     e.preventDefault();
     setLoading(true);
     setError('');

@@ -4,6 +4,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+// 이 컴포넌트는 "파일 선택 + 미리보기 + 직접 크롭"을 한 번에 담당합니다.
+// 사용자는 모바일 카드에서 보일 영역을 미리 맞춘 뒤 저장할 수 있습니다.
 const CROP_VIEWPORT_WIDTH = 320;
 const CROP_VIEWPORT_HEIGHT = 240;
 const OUTPUT_IMAGE_WIDTH = 1200;
@@ -27,28 +29,36 @@ type PetPhotoPickerProps = {
 };
 
 type CropPosition = {
+  // x, y는 "현재 사진이 크롭 프레임 안에서 얼마나 이동했는지"를 뜻합니다.
+  // 둘 다 0이면 사진의 왼쪽 위가 프레임의 왼쪽 위에 붙어 있는 상태에 가깝습니다.
   x: number;
   y: number;
 };
 
 type LoadedImage = {
+  // src는 브라우저가 임시로 만든 Object URL입니다.
+  // width/height는 원본 사진 자체의 실제 픽셀 크기입니다.
   src: string;
   width: number;
   height: number;
 };
 
+// 사람이 읽기 쉬운 MB 문자열로 바꿔 에러 메시지에 사용합니다.
 function formatFileSize(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
 }
 
+// 확장자를 제외한 파일 이름을 뽑아서, 최종 저장 파일명에 재사용합니다.
 function getFileBaseName(name: string) {
   return name.replace(/\.[^.]+$/, '') || 'pet-photo';
 }
 
+// 크롭 프레임을 빈 공간 없이 꽉 채우려면 이미지가 최소 얼마까지 확대돼야 하는지 계산합니다.
 function getMinimumScale(image: LoadedImage) {
   return Math.max(CROP_VIEWPORT_WIDTH / image.width, CROP_VIEWPORT_HEIGHT / image.height);
 }
 
+// 사용자가 이미지를 너무 멀리 드래그해서 빈 배경이 보이지 않도록 좌표를 제한합니다.
 function clampPosition(position: CropPosition, width: number, height: number) {
   const minX = Math.min(0, CROP_VIEWPORT_WIDTH - width);
   const minY = Math.min(0, CROP_VIEWPORT_HEIGHT - height);
@@ -59,6 +69,7 @@ function clampPosition(position: CropPosition, width: number, height: number) {
   };
 }
 
+// 처음 크롭 다이얼로그를 열었을 때 사진이 가운데에 보이도록 시작 위치를 계산합니다.
 function centerPosition(width: number, height: number) {
   return clampPosition(
     {
@@ -70,6 +81,7 @@ function centerPosition(width: number, height: number) {
   );
 }
 
+// File 객체를 브라우저 이미지로 읽어 크기 정보를 준비합니다.
 async function loadImage(file: File) {
   const src = URL.createObjectURL(file);
   const image = document.createElement('img');
@@ -92,6 +104,8 @@ async function loadImage(file: File) {
   }
 }
 
+// 사용자가 고른 위치/줌 값을 바탕으로 실제 업로드용 이미지를 새로 만듭니다.
+// 핵심은 "원본 이미지의 어떤 영역을 잘라낼지"를 계산한 뒤 canvas에 다시 그리는 것입니다.
 async function createCroppedImageFile(
   sourceFile: File,
   image: LoadedImage,
@@ -119,6 +133,7 @@ async function createCroppedImageFile(
     throw new Error('사진 편집을 준비하지 못했습니다.');
   }
 
+  // 크롭 프레임과 같은 4:3 비율로 저장해야, 미리보기와 결과 이미지가 다르게 보이지 않습니다.
   canvas.width = OUTPUT_IMAGE_WIDTH;
   canvas.height = OUTPUT_IMAGE_HEIGHT;
   context.drawImage(
@@ -158,10 +173,25 @@ function ImageCropDialog({
   onClose: () => void;
   onComplete: (file: File) => Promise<void> | void;
 }) {
+  // 다이얼로그 내부에서는 "현재 불러온 이미지", "줌 값", "사진 위치"를
+  // 별도의 state로 관리해야 실시간 드래그/확대 UI가 가능합니다.
   const [loadedImage, setLoadedImage] = useState<LoadedImage | null>(null);
+
+  // zoom:
+  // 1이면 최소 확대 상태, 3에 가까울수록 더 많이 확대된 상태입니다.
   const [zoom, setZoom] = useState(1);
+
+  // position:
+  // 사용자가 드래그해서 사진을 어디로 옮겼는지 저장합니다.
   const [position, setPosition] = useState<CropPosition>({ x: 0, y: 0 });
+
+  // saving:
+  // "사용하기"를 눌러 실제 이미지 파일을 만드는 중인지 여부입니다.
   const [saving, setSaving] = useState(false);
+
+  // dragStateRef:
+  // 드래그 시작 시점의 마우스/터치 좌표를 기억해두는 임시 저장소입니다.
+  // ref를 쓰는 이유는 드래그 중 자주 바뀌는 값을 렌더링과 분리하고 싶기 때문입니다.
   const dragStateRef = useRef<{
     pointerId: number;
     startX: number;
@@ -174,6 +204,7 @@ function ImageCropDialog({
       return;
     }
 
+    // 파일이 바뀔 때마다 새 이미지를 읽고, 이전 Object URL은 정리합니다.
     let active = true;
     let loadedSrc = '';
 
@@ -225,6 +256,8 @@ function ImageCropDialog({
     const safeZoom = Math.min(3, Math.max(1, nextZoom));
     const currentScale = minScale * zoom;
     const nextScale = minScale * safeZoom;
+    // 줌을 바꿔도 사용자가 보고 있던 중심점이 크게 튀지 않게,
+    // 현재 중앙이 원본 이미지의 어느 지점을 가리키는지 기준으로 다시 계산합니다.
     const centerSourceX = (CROP_VIEWPORT_WIDTH / 2 - position.x) / currentScale;
     const centerSourceY = (CROP_VIEWPORT_HEIGHT / 2 - position.y) / currentScale;
     const nextWidth = loadedImage.width * nextScale;
@@ -248,6 +281,8 @@ function ImageCropDialog({
       return;
     }
 
+    // drag 시작 시점의 포인터 위치와 이미지 원래 위치를 기억해두면,
+    // move 이벤트에서 차이값(delta)만 계산해 자연스럽게 이동시킬 수 있습니다.
     dragStateRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -292,6 +327,7 @@ function ImageCropDialog({
       return;
     }
 
+    // "사용하기"를 누르면 실제로 잘린 이미지를 만들고 부모 컴포넌트에 전달합니다.
     setSaving(true);
 
     try {
@@ -422,9 +458,24 @@ export default function PetPhotoPicker({
   onProcessingChange,
   maxUploadBytes = DEFAULT_MAX_UPLOAD_BYTES,
 }: PetPhotoPickerProps) {
+  // 부모는 "최종 선택된 파일"만 필요하고,
+  // 이 컴포넌트는 그 전에 열리는 크롭용 임시 상태도 함께 관리합니다.
+
+  // cropSourceFile:
+  // 사용자가 방금 파일 선택창에서 고른 "원본 파일"입니다.
+  // 아직 최종 저장된 파일이 아니라, 크롭 다이얼로그에 보여주기 위한 값입니다.
   const [cropSourceFile, setCropSourceFile] = useState<File | null>(null);
+
+  // cropOpen:
+  // 크롭 다이얼로그를 열지 닫을지 제어합니다.
   const [cropOpen, setCropOpen] = useState(false);
+
+  // processing:
+  // 최종 파일을 준비해서 부모에게 넘기는 중인지 여부입니다.
   const [processing, setProcessing] = useState(false);
+
+  // previewUrl:
+  // 사용자가 선택한 최종 이미지를 브라우저에서 즉시 보여주기 위한 임시 URL입니다.
   const [previewUrl, setPreviewUrl] = useState('');
 
   useEffect(() => {
@@ -443,6 +494,7 @@ export default function PetPhotoPicker({
     setProcessing(true);
 
     try {
+      // 최종 저장 전 용량 제한을 한 번 더 검사해 업로드 실패를 미리 막습니다.
       if (file.size > maxUploadBytes) {
         throw new Error(
           `사진 용량이 너무 커요. 현재 ${formatFileSize(file.size)}라서 4MB 이하 사진으로 다시 선택해주세요.`
@@ -453,6 +505,7 @@ export default function PetPhotoPicker({
         URL.revokeObjectURL(previewUrl);
       }
 
+      // 미리보기는 서버 업로드 전에 브라우저에서 바로 보여주기 위해 Object URL을 사용합니다.
       setPreviewUrl(URL.createObjectURL(file));
       onChange(file);
     } finally {
@@ -461,6 +514,10 @@ export default function PetPhotoPicker({
   }
 
   const displayPreviewUrl = previewUrl || existingImageUrl || '';
+
+  // displayPreviewUrl:
+  // 우선순위는 "방금 새로 고른 미리보기" -> "기존 저장된 사진 URL" 순서입니다.
+  // 수정 페이지에서 이 로직이 특히 중요합니다.
 
   return (
     <>

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
+// 사용자가 입력한 등록코드가 "존재하는지 / 이미 사용됐는지"를 확인하는 API입니다.
 export async function POST(req: Request) {
   const supabaseAdmin = getSupabaseAdmin();
   const { registration_code } = await req.json();

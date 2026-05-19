@@ -5,6 +5,13 @@ import { hashPetPassword } from '@/lib/pet-password';
 import QRCode from 'qrcode';
 import { Buffer } from 'node:buffer';
 
+// 이 파일은 반려견 등록(POST)과 수정(PATCH) 둘 다 담당하는 핵심 API입니다.
+// 초심자 관점에서는 아래 순서로 읽으면 이해가 쉽습니다.
+// 1) formData에서 값 꺼내기
+// 2) 값 검증하기
+// 3) DB/스토리지 조회
+// 4) 파일 업로드와 QR 생성
+// 5) 최종 저장 또는 수정
 const MAX_PET_NAME_LENGTH = 20;
 const MAX_OWNER_NAME_LENGTH = 20;
 const MAX_LOCATION_LENGTH = 50;
@@ -13,10 +20,14 @@ const MAX_USER_ID_LENGTH = 20;
 const ALLOWED_GENDERS = new Set(['', 'male', 'female']);
 
 function getFormString(formData: FormData, name: string) {
+  // FormData의 값은 File일 수도 있고 null일 수도 있으므로,
+  // 문자열 입력 칸은 이렇게 안전하게 꺼내두면 이후 코드가 단순해집니다.
   return String(formData.get(name) || '').trim();
 }
 
 function parseBirthYear(value: string) {
+  // birth_year는 선택값이라 비어 있으면 null을 허용합니다.
+  // DB에는 빈 문자열보다 null이 더 자연스러운 표현입니다.
   if (!value) {
     return null;
   }
@@ -36,6 +47,8 @@ function parseBirthYear(value: string) {
 }
 
 function parseGender(value: string) {
+  // 성별은 UI에서 radio 버튼으로 골라주지만,
+  // 서버에서도 다시 허용값인지 검사해야 안전합니다.
   if (!ALLOWED_GENDERS.has(value)) {
     throw new Error('성별은 남아 또는 여아만 선택할 수 있어요.');
   }
@@ -44,6 +57,7 @@ function parseGender(value: string) {
 }
 
 function parseUserId(value: string) {
+  // 고객 ID는 로그인/조회 URL에 쓰이므로 형식을 엄격하게 제한합니다.
   const normalized = value.trim().toLowerCase();
 
   if (!normalized) {
@@ -58,12 +72,14 @@ function parseUserId(value: string) {
 }
 
 function validateTextLength(value: string, maxLength: number, label: string) {
+  // 긴 텍스트가 DB 컬럼 길이 또는 UI 설계를 깨지 않게 막는 공통 검사 함수입니다.
   if (value.length > maxLength) {
     throw new Error(`${label}은(는) ${maxLength}자 이하로 입력해주세요.`);
   }
 }
 
 function getUploadFileName(file: File, fallbackName: string) {
+  // 업로드 파일명은 특수문자와 긴 이름을 정리해서 스토리지 경로 문제를 줄입니다.
   const extension = file.type === 'image/png' ? 'png' : 'jpg';
   const safeBaseName = file.name
     .replace(/\.[^.]+$/, '')
@@ -75,6 +91,8 @@ function getUploadFileName(file: File, fallbackName: string) {
 }
 
 function getPetImagePathFromPublicUrl(publicUrl: string) {
+  // Supabase 공개 URL에서 "버킷 내부 실제 파일 경로"만 다시 뽑아냅니다.
+  // 수정 시 예전 이미지를 삭제할 때 필요합니다.
   if (!publicUrl) {
     return null;
   }
@@ -100,6 +118,7 @@ async function uploadFileToStorage(
   path: string,
   contentType: string
 ) {
+  // 브라우저 File은 arrayBuffer()로 읽고, 서버에서는 Buffer로 바꿔 업로드합니다.
   const supabaseAdmin = getSupabaseAdmin();
   const fileBuffer = Buffer.from(await file.arrayBuffer());
   const { error } = await supabaseAdmin.storage
@@ -121,6 +140,8 @@ async function uploadFileToStorage(
 }
 
 async function removeStorageFile(path: string) {
+  // 예전 사진을 정리하는 보조 함수입니다.
+  // 삭제 실패가 전체 수정 실패가 되면 UX가 너무 나빠져서 여기서는 로그만 남깁니다.
   const supabaseAdmin = getSupabaseAdmin();
   const { error } = await supabaseAdmin.storage
     .from('pet-images')
@@ -136,6 +157,7 @@ async function uploadBufferToStorage(
   path: string,
   contentType: string
 ) {
+  // QR 이미지는 File이 아니라 코드로 생성한 Buffer라서 별도 업로드 함수가 필요합니다.
   const supabaseAdmin = getSupabaseAdmin();
   const { error } = await supabaseAdmin.storage
     .from('pet-images')
@@ -159,6 +181,7 @@ export async function POST(req: Request) {
   try {
     const supabaseAdmin = getSupabaseAdmin();
     const formData = await req.formData();
+    // 1. 요청에서 문자열 입력값과 파일을 꺼냅니다.
     const pet_name = getFormString(formData, 'pet_name');
     const owner_name = getFormString(formData, 'owner_name');
     const phone = getFormString(formData, 'phone');
@@ -170,12 +193,23 @@ export async function POST(req: Request) {
     const emergency_note = getFormString(formData, 'emergency_note');
     const location = getFormString(formData, 'location');
     const code = getFormString(formData, 'registration_code').toUpperCase();
+
+    // plainPassword:
+    // 사용자가 입력한 원본 비밀번호
+    // 이후 hashPetPassword()로 변환해서 DB에 저장합니다.
     const plainPassword = getFormString(formData, 'password');
+
+    // imageFile:
+    // 클라이언트의 PetPhotoPicker가 준비한 최종 크롭 이미지 파일입니다.
     const imageFile = formData.get('image_file');
+
+    // parsed* 변수들:
+    // raw 문자열을 "서버가 신뢰할 수 있는 형태"로 바꾼 값입니다.
     const parsedUserId = parseUserId(user_id);
     const parsedGender = parseGender(gender);
     const parsedBirthYear = parseBirthYear(birth_year);
 
+    // 2. 길이/형식 검증은 DB에 쓰기 전에 최대한 앞단에서 끝내는 편이 좋습니다.
     validateTextLength(parsedUserId, MAX_USER_ID_LENGTH, '고객 ID');
     validateTextLength(pet_name, MAX_PET_NAME_LENGTH, '반려견 이름');
     validateTextLength(owner_name, MAX_OWNER_NAME_LENGTH, '보호자 이름');
@@ -196,6 +230,7 @@ export async function POST(req: Request) {
       );
     }
 
+    // 3. 등록코드가 실제로 존재하는지, 아직 사용되지 않았는지 확인합니다.
     const { data: registrationCodeData, error: registrationCodeError } = await supabaseAdmin
       .from('registration_codes')
       .select('code, pet_id')
@@ -216,6 +251,7 @@ export async function POST(req: Request) {
       );
     }
 
+    // 4. 고객 ID는 공개 URL 조회와 수정 로그인에 사용되므로 중복되면 안 됩니다.
     const { data: existingUserId, error: existingUserIdError } = await supabaseAdmin
       .from('pets')
       .select('id')
@@ -236,11 +272,23 @@ export async function POST(req: Request) {
       );
     }
 
+    // 5. 저장에 필요한 파생값을 만듭니다.
+    // id: 공개 페이지 URL에 들어갈 식별자
+    // passwordHash: DB에 저장할 비밀번호 해시
+    // imageUrl: 사진 업로드 결과 URL
     const id = nanoid(8);
     const baseUrl =
       process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
     const url = `${baseUrl}/pet/${id}`;
+
+    // passwordHash:
+    // 실제 DB에 저장되는 값입니다.
+    // 사용자가 입력한 비밀번호 원문 대신, 등록코드와 함께 해시한 문자열이 들어갑니다.
     const passwordHash = hashPetPassword(plainPassword, code);
+
+    // imageUrl:
+    // 스토리지 업로드가 끝난 뒤 DB에 저장할 공개 URL입니다.
+    // 사진이 없으면 빈 문자열로 남습니다.
     let imageUrl = '';
 
     if (imageFile instanceof File && imageFile.size > 0) {
@@ -252,6 +300,7 @@ export async function POST(req: Request) {
       );
     }
 
+    // QR 이미지는 공개 페이지 URL을 기반으로 서버에서 생성합니다.
     const qrPath = `qr_code/${id}.png`;
     const qrBuffer = await QRCode.toBuffer(url, {
       width: 800,
@@ -259,6 +308,7 @@ export async function POST(req: Request) {
     });
     const qrImageUrl = await uploadBufferToStorage(qrBuffer, qrPath, 'image/png');
 
+    // 6. 실제 pets 테이블에 insert합니다.
     const { error } = await supabaseAdmin.from('pets').insert({
       id,
       registration_code: code,
@@ -284,6 +334,7 @@ export async function POST(req: Request) {
       );
     }
 
+    // 7. 등록코드도 "이미 사용됨" 상태로 바꿔서 재사용을 막습니다.
     const { error: registrationCodeUpdateError } = await supabaseAdmin
       .from('registration_codes')
       .update({
@@ -317,6 +368,7 @@ export async function PATCH(req: Request) {
   try {
     const supabaseAdmin = getSupabaseAdmin();
     const formData = await req.formData();
+    // 수정은 "현재 로그인한 사용자"와 "바꿀 값"을 함께 받습니다.
     const current_user_id = getFormString(formData, 'current_user_id');
     const user_id = getFormString(formData, 'user_id');
     const plainPassword = getFormString(formData, 'password');
@@ -344,6 +396,7 @@ export async function PATCH(req: Request) {
       );
     }
 
+    // 먼저 현재 사용자 인증을 통과해야 다른 값 수정이 가능합니다.
     const { data: pet, error: petError } = await supabaseAdmin
       .from('pets')
       .select('id, password_hash, image_url, registration_code')
@@ -359,6 +412,7 @@ export async function PATCH(req: Request) {
       );
     }
 
+    // 수정 시에도 고객 ID가 다른 반려견과 충돌하면 안 되므로 다시 검사합니다.
     const { data: duplicatedUserId, error: duplicatedUserIdError } = await supabaseAdmin
       .from('pets')
       .select('id')
@@ -381,8 +435,12 @@ export async function PATCH(req: Request) {
     }
 
     let imageUrl = pet.image_url || '';
+
+    // oldImagePath:
+    // 새 사진 업로드가 성공했을 때만 이전 파일을 지우기 위해 기억해두는 값입니다.
     let oldImagePath: string | null = null;
 
+    // 새 이미지가 들어온 경우에만 업로드하고, 아니면 기존 URL을 유지합니다.
     if (imageFile instanceof File && imageFile.size > 0) {
       oldImagePath = getPetImagePathFromPublicUrl(pet.image_url || '');
       const imagePath = `pet_photos/${pet.id}-${getUploadFileName(imageFile, 'pet-photo')}`;
@@ -393,6 +451,7 @@ export async function PATCH(req: Request) {
       );
     }
 
+    // updateData는 실제로 DB에 반영할 필드 묶음입니다.
     const updateData = {
       user_id: parsedUserId,
       pet_name,
@@ -419,6 +478,7 @@ export async function PATCH(req: Request) {
       );
     }
 
+    // 수정이 성공한 뒤에만 예전 사진 정리를 시도합니다.
     if (oldImagePath) {
       const newImagePath = getPetImagePathFromPublicUrl(imageUrl);
 

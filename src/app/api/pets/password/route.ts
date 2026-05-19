@@ -3,6 +3,9 @@ import { customAlphabet } from 'nanoid';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { hashPetPassword } from '@/lib/pet-password';
 
+// 비슷해 보이는 두 기능을 한 파일에 두었습니다.
+// POST: 관리자가 등록코드로 임시 비밀번호 발급
+// PATCH: 사용자가 현재 비밀번호를 알고 있을 때 직접 새 비밀번호로 변경
 const createTemporaryPassword = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789', 10);
 
 export async function POST(req: Request) {
