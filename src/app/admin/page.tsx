@@ -8,6 +8,7 @@ import { useState } from 'react';
 type CreatedCode = {
   code: string;
   created_at: string;
+  qr_image_url: string;
 };
 
 type PetQr = {
@@ -224,7 +225,7 @@ export default function AdminPage() {
             관리자 페이지
           </h1>
           <p className="mt-4 text-sm leading-6 text-[#6f6657]">
-            등록코드 생성, 임시 비밀번호 발급, QR 조회를 한 곳에서 관리합니다.
+            등록코드와 QR 생성, 임시 비밀번호 발급, QR 조회를 한 곳에서 관리합니다.
           </p>
         </header>
 
@@ -291,7 +292,7 @@ export default function AdminPage() {
                     disabled={loading}
                     className="h-13 w-full rounded-xl bg-[#ffd766] px-5 text-sm font-black text-[#211a0c] shadow-[0_10px_24px_rgba(229,173,36,0.28)] transition hover:bg-[#ffcc3d] disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {loading ? '생성 중...' : '등록코드 생성하기'}
+                    {loading ? '생성 중...' : '등록코드와 QR 생성하기'}
                   </button>
                 </form>
 
@@ -300,22 +301,46 @@ export default function AdminPage() {
                     {createdCodes.map((item) => (
                       <article
                         key={`${item.code}-${item.created_at}`}
-                        className="flex items-center justify-between gap-3 rounded-2xl border border-[#eee8dc] bg-[#fffdf8] p-4"
+                        className="rounded-2xl border border-[#eee8dc] bg-[#fffdf8] p-4"
                       >
-                        <div>
-                          <p className="font-black tracking-wide">{item.code}</p>
-                          <p className="mt-1 text-xs text-[#8b8378]">
-                            {new Date(item.created_at).toLocaleString('ko-KR')}
-                          </p>
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-black tracking-wide">{item.code}</p>
+                            <p className="mt-1 text-xs text-[#8b8378]">
+                              {new Date(item.created_at).toLocaleString('ko-KR')}
+                            </p>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => copyText(item.code)}
+                            className="rounded-xl bg-[#171717] px-4 py-2 text-xs font-black text-white"
+                          >
+                            복사
+                          </button>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => copyText(item.code)}
-                          className="rounded-xl bg-[#171717] px-4 py-2 text-xs font-black text-white"
-                        >
-                          복사
-                        </button>
+                        <div className="mt-4 flex items-center gap-4 rounded-xl bg-white p-3">
+                          <Image
+                            src={item.qr_image_url}
+                            alt={`${item.code} QR 코드`}
+                            width={104}
+                            height={104}
+                            unoptimized
+                            className="shrink-0 rounded-lg border border-[#eee8dc]"
+                          />
+
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-[#8b8378]">QR 코드</p>
+                            <button
+                              type="button"
+                              onClick={() => downloadQrImage(item.qr_image_url, `registration-${item.code}.png`)}
+                              className="mt-2 rounded-xl bg-[#24963a] px-4 py-2 text-xs font-black text-white"
+                            >
+                              다운로드
+                            </button>
+                          </div>
+                        </div>
                       </article>
                     ))}
                   </div>

@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { nanoid } from 'nanoid';
 import { hashPetPassword } from '@/lib/pet-password';
-import QRCode from 'qrcode';
-import { Buffer } from 'node:buffer';
 
 // 이 파일은 반려견 등록(POST)과 수정(PATCH) 둘 다 담당하는 핵심 API입니다.
 // 초심자 관점에서는 아래 순서로 읽으면 이해가 쉽습니다.
@@ -152,31 +150,6 @@ async function removeStorageFile(path: string) {
   }
 }
 
-async function uploadBufferToStorage(
-  buffer: Buffer,
-  path: string,
-  contentType: string
-) {
-  // QR 이미지는 File이 아니라 코드로 생성한 Buffer라서 별도 업로드 함수가 필요합니다.
-  const supabaseAdmin = getSupabaseAdmin();
-  const { error } = await supabaseAdmin.storage
-    .from('pet-images')
-    .upload(path, buffer, {
-      contentType,
-      upsert: true,
-    });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  const { data } = supabaseAdmin.storage
-    .from('pet-images')
-    .getPublicUrl(path);
-
-  return data.publicUrl;
-}
-
 export async function POST(req: Request) {
   try {
     const supabaseAdmin = getSupabaseAdmin();
@@ -233,7 +206,7 @@ export async function POST(req: Request) {
     // 3. 등록코드가 실제로 존재하는지, 아직 사용되지 않았는지 확인합니다.
     const { data: registrationCodeData, error: registrationCodeError } = await supabaseAdmin
       .from('registration_codes')
-      .select('code, pet_id')
+      .select('code, pet_id, used_at, qr_image_url')
       .eq('code', code)
       .single();
 
@@ -244,7 +217,7 @@ export async function POST(req: Request) {
       );
     }
 
-    if (registrationCodeData.pet_id) {
+    if (registrationCodeData.used_at) {
       return NextResponse.json(
         { error: '이미 사용된 등록코드입니다.' },
         { status: 409 }
@@ -273,10 +246,11 @@ export async function POST(req: Request) {
     }
 
     // 5. 저장에 필요한 파생값을 만듭니다.
-    // id: 공개 페이지 URL에 들어갈 식별자
+    // id: 관리자가 QR 생성 시 미리 예약해둔 공개 페이지 ID입니다.
+    // registration_codes.pet_id에 저장된 값이 곧 pets.id가 됩니다.
     // passwordHash: DB에 저장할 비밀번호 해시
     // imageUrl: 사진 업로드 결과 URL
-    const id = nanoid(8);
+    const id = registrationCodeData.pet_id || nanoid(8);
     const baseUrl =
       process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
     const url = `${baseUrl}/pet/${id}`;
@@ -300,16 +274,13 @@ export async function POST(req: Request) {
       );
     }
 
-    // QR 이미지는 공개 페이지 URL을 기반으로 서버에서 생성합니다.
-    const qrPath = `qr_code/${id}.png`;
-    const qrBuffer = await QRCode.toBuffer(url, {
-      width: 800,
-      errorCorrectionLevel: 'H',
-    });
-    const qrImageUrl = await uploadBufferToStorage(qrBuffer, qrPath, 'image/png');
+    // qrImageUrl:
+    // 관리자가 등록코드 생성 시 미리 만든 QR 이미지 URL을 그대로 사용합니다.
+    const qrImageUrl = registrationCodeData.qr_image_url || '';
 
-    // 6. 실제 pets 테이블에 insert합니다.
-    const { error } = await supabaseAdmin.from('pets').insert({
+    // 6. 관리자가 미리 만들어둔 빈 pets 행을 채우거나,
+    //    혹시 행이 없다면 새로 만들어서 정보 등록을 완료합니다.
+    const { error } = await supabaseAdmin.from('pets').upsert({
       id,
       registration_code: code,
       user_id: parsedUserId,
@@ -325,6 +296,8 @@ export async function POST(req: Request) {
       image_url: imageUrl,
       qr_image_url: qrImageUrl,
       location,
+    }, {
+      onConflict: 'id',
     });
 
     if (error) {
@@ -342,7 +315,7 @@ export async function POST(req: Request) {
         used_at: new Date().toISOString(),
       })
       .eq('code', code)
-      .is('pet_id', null);
+      .is('used_at', null);
 
     if (registrationCodeUpdateError) {
       return NextResponse.json(

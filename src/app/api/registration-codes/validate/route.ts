@@ -16,7 +16,7 @@ export async function POST(req: Request) {
 
   const { data, error } = await supabaseAdmin
     .from('registration_codes')
-    .select('code, pet_id')
+    .select('code, pet_id, used_at')
     .eq('code', code)
     .single();
 
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     );
   }
 
-  if (data.pet_id) {
+  if (data.used_at) {
     return NextResponse.json(
       { error: '이미 사용된 등록코드입니다.' },
       { status: 409 }

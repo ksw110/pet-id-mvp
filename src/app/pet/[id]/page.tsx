@@ -44,20 +44,110 @@ export default async function Page({ params }: Props) {
   const { id } = await params;
 
   // 서버 컴포넌트이므로 브라우저를 거치지 않고 바로 DB 조회를 수행할 수 있습니다.
-  const { data, error } = await supabase
+  const { data: pet } = await supabase
     .from('pets')
     .select('*')
     .eq('id', id)
-    .single();
+    .maybeSingle();
 
-  // notFound()를 호출하면 Next.js가 404 페이지 흐름으로 전환합니다.
-  if (error || !data) return notFound();
+  // pets 행이 아직 없더라도 registration_codes에는 QR 정보가 남아 있을 수 있습니다.
+  // 이 경우에는 404 대신 "등록 준비 중" 화면을 보여줘서 QR 링크가 끊기지 않게 합니다.
+  if (!pet) {
+    const { data: registrationCode } = await supabase
+      .from('registration_codes')
+      .select('pet_id')
+      .eq('pet_id', id)
+      .maybeSingle();
+
+    if (!registrationCode) {
+      // notFound()를 호출하면 Next.js가 404 페이지 흐름으로 전환합니다.
+      return notFound();
+    }
+  }
+
+  const data =
+    pet ??
+    ({
+      image_url: '',
+      pet_name: '',
+      owner_name: '',
+      phone: '',
+      emergency_phone: '',
+      animal_registration_number: '',
+      location: '',
+      emergency_note: '',
+      gender: null,
+      birth_year: null,
+    } as const);
 
   const genderLabel = getGenderLabel(data.gender);
   const ageLabel = getAgeLabel(data.birth_year);
+  const isRegistrationPending =
+    !data.pet_name || !data.phone || !data.owner_name;
 
   // genderLabel / ageLabel은 "화면 표시용 가공 데이터"입니다.
   // DB 원본값을 그대로 쓰기보다, JSX가 읽기 쉽게 미리 변환해둔 값입니다.
+
+  if (isRegistrationPending) {
+    return (
+      <main className="min-h-screen bg-[#fbfaf7] px-4 py-5 text-[#171717] sm:px-6 sm:py-10">
+        <section className="mx-auto max-w-[430px] overflow-hidden rounded-[34px] border border-[#e9e4dc] bg-white shadow-[0_24px_70px_rgba(55,45,30,0.12)]">
+          <div className="relative aspect-[4/3] w-full overflow-hidden bg-[#f6f0e8]">
+            {data.image_url ? (
+              <>
+                <Image
+                  src={data.image_url}
+                  alt=""
+                  fill
+                  unoptimized
+                  aria-hidden="true"
+                  sizes="(max-width: 768px) 100vw, 430px"
+                  className="scale-110 object-cover opacity-50 blur-xl"
+                />
+                <Image
+                  src={data.image_url}
+                  alt="등록 전 반려견 사진"
+                  fill
+                  unoptimized
+                  sizes="(max-width: 768px) 100vw, 430px"
+                  className="object-cover object-center"
+                />
+                <div className="absolute inset-x-0 bottom-0 h-24 bg-[linear-gradient(180deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.8)_70%,rgba(255,255,255,1)_100%)]" />
+              </>
+            ) : (
+              <div className="grid h-full w-full place-items-center bg-[#fff2c7]">
+                <span className="text-[72px] leading-none sm:text-[92px]">🐶</span>
+              </div>
+            )}
+          </div>
+
+          <div className="-mt-3 rounded-t-[30px] bg-white px-4 pb-6 pt-5 sm:px-5">
+            <div className="mb-6 flex justify-center">
+              <div className="flex w-full items-center justify-center gap-2 rounded-[20px] bg-[#eef8ef] px-5 py-3 text-center text-sm font-black leading-6 text-[#2f9d46]">
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-white text-[13px]">♧</span>
+                <span className="min-w-0 break-keep">이 아이는 아직 정보 등록 중이에요</span>
+              </div>
+            </div>
+
+            <h1 className="mb-5 text-[34px] font-black tracking-[-0.03em]">
+              등록 정보 준비 중
+            </h1>
+
+            <p className="text-[15px] leading-7 text-[#6f6657]">
+              관리자가 QR 코드를 먼저 만들었어요. 보호자가 정보를 등록하면 이 페이지에 이름, 연락처, 활동 지역이 표시됩니다.
+            </p>
+
+            <div className="mt-8 rounded-2xl bg-[#edf8ee] p-5 text-sm text-[#244a2b]">
+              <p className="mb-2 font-black">정보 등록 전이에요</p>
+              <p className="leading-6">
+                아직 보호자 정보가 입력되지 않았습니다. 등록이 끝나면 공개 상세 페이지로 자동 연결됩니다.
+              </p>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#fbfaf7] px-4 py-5 text-[#171717] sm:px-6 sm:py-10">

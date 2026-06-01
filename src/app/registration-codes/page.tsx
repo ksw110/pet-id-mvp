@@ -1,11 +1,13 @@
 'use client';
 
+import Image from 'next/image';
 import { useState } from 'react';
 
 // 등록코드 생성과 임시 비밀번호 발급을 각각 폼으로 분리한 관리자 페이지입니다.
 type CreatedCode = {
   code: string;
   created_at: string;
+  qr_image_url: string;
 };
 
 export default function RegistrationCodesPage() {
@@ -95,6 +97,22 @@ export default function RegistrationCodesPage() {
     alert('등록코드를 복사했어요.');
   }
 
+  async function downloadQrImage(url: string, fileName: string) {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+
+      link.href = objectUrl;
+      link.download = fileName;
+      link.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      alert('QR 다운로드에 실패했어요. 잠시 후 다시 시도해주세요.');
+    }
+  }
+
   async function handleResetPassword(e: React.FormEvent<HTMLFormElement>) {
     // 등록코드를 알고 있는 관리자만 임시 비밀번호를 발급하도록 만든 흐름입니다.
     e.preventDefault();
@@ -138,10 +156,10 @@ export default function RegistrationCodesPage() {
 
           <p className="mb-3 text-sm font-bold text-[#d69b14]">Registration Codes</p>
           <h1 className="text-3xl font-black leading-tight sm:text-4xl">
-            등록코드 생성
+            등록코드와 QR 생성
           </h1>
           <p className="mt-4 text-sm leading-6 text-[#6f6657]">
-            고객에게 전달할 1회용 등록코드를 생성합니다. 등록코드 하나는 QR 하나에만 사용할 수 있어요.
+            고객에게 전달할 1회용 등록코드와 QR 코드를 함께 생성합니다. 등록코드 하나는 QR 하나에만 사용할 수 있어요.
           </p>
         </header>
 
@@ -183,7 +201,7 @@ export default function RegistrationCodesPage() {
                 disabled={loading}
                 className="h-13 w-full rounded-xl bg-[#ffd766] px-5 text-sm font-black text-[#211a0c] shadow-[0_10px_24px_rgba(229,173,36,0.28)] transition hover:bg-[#ffcc3d] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {loading ? '생성 중...' : '등록코드 생성하기'}
+                {loading ? '생성 중...' : '등록코드와 QR 생성하기'}
               </button>
             </form>
 
@@ -227,22 +245,46 @@ export default function RegistrationCodesPage() {
             {createdCodes.map((item) => (
               <article
                 key={`${item.code}-${item.created_at}`}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-[#eee8dc] bg-[#fffdf8] p-4"
+                className="rounded-2xl border border-[#eee8dc] bg-[#fffdf8] p-4"
               >
-                <div>
-                  <p className="font-black tracking-wide">{item.code}</p>
-                  <p className="mt-1 text-xs text-[#8b8378]">
-                    {new Date(item.created_at).toLocaleString('ko-KR')}
-                  </p>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-black tracking-wide">{item.code}</p>
+                    <p className="mt-1 text-xs text-[#8b8378]">
+                      {new Date(item.created_at).toLocaleString('ko-KR')}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => copyCode(item.code)}
+                    className="rounded-xl bg-[#171717] px-4 py-2 text-xs font-black text-white"
+                  >
+                    복사
+                  </button>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => copyCode(item.code)}
-                  className="rounded-xl bg-[#171717] px-4 py-2 text-xs font-black text-white"
-                >
-                  복사
-                </button>
+                <div className="mt-4 flex items-center gap-4 rounded-xl bg-white p-3">
+                  <Image
+                    src={item.qr_image_url}
+                    alt={`${item.code} QR 코드`}
+                    width={104}
+                    height={104}
+                    unoptimized
+                    className="shrink-0 rounded-lg border border-[#eee8dc]"
+                  />
+
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-[#8b8378]">QR 코드</p>
+                    <button
+                      type="button"
+                      onClick={() => downloadQrImage(item.qr_image_url, `registration-${item.code}.png`)}
+                      className="mt-2 rounded-xl bg-[#24963a] px-4 py-2 text-xs font-black text-white"
+                    >
+                      다운로드
+                    </button>
+                  </div>
+                </div>
               </article>
             ))}
           </div>

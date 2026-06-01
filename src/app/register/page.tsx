@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import PetPhotoPicker from '@/components/PetPhotoPicker';
 import PrivacyPolicyContent from '../privacy/PrivacyPolicyContent';
 
@@ -116,11 +115,6 @@ export default function RegisterPage() {
   // 사용자가 최종적으로 선택하고 크롭까지 끝낸 업로드용 파일입니다.
   // 이 값은 submit 시 FormData에 `image_file`이라는 이름으로 서버에 전송됩니다.
   const [imageFile, setImageFile] = useState<File | null>(null);
-
-  // qrImage:
-  // 등록 성공 후 서버가 생성해준 QR 이미지 URL입니다.
-  // 등록 결과 화면에서 미리보기로 사용됩니다.
-  const [qrImage, setQrImage] = useState('');
 
   // resultUrl:
   // 등록 성공 후 만들어진 공개 상세 페이지 URL입니다.
@@ -313,15 +307,13 @@ export default function RegisterPage() {
         throw new Error('QR 생성 결과를 불러오지 못했어요.');
       }
 
-      setQrImage(data.qr_image_url || '');
       setResultUrl(data.url);
-      setSubmitMessage('QR 코드가 생성됐어요.');
+      setSubmitMessage('등록이 완료됐어요.');
 
       // 결과 섹션은 폼 아래쪽에 있어서, 등록 직후 사용자가 못 보고 지나칠 수 있습니다.
       // 그래서 성공하면 결과 영역으로 자동 스크롤합니다.
-      // 결과를 바로 볼 수 있게 성공 후 특정 영역으로 스크롤합니다.
       window.setTimeout(() => {
-        document.getElementById('qr-result')?.scrollIntoView({
+        document.getElementById('register-result')?.scrollIntoView({
           behavior: 'smooth',
           block: 'start',
         });
@@ -678,7 +670,7 @@ export default function RegisterPage() {
               disabled={loading || processingImage || !privacyAgreed}
               className="mt-3 h-13 w-full rounded-xl bg-[#ffd766] px-5 text-sm font-black text-[#211a0c] shadow-[0_10px_24px_rgba(229,173,36,0.28)] transition hover:bg-[#ffcc3d] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? '생성 중...' : 'QR 코드 생성하기  🐾'}
+              {loading ? '등록 중...' : '정보 등록하기'}
             </button>
           </form>
 
@@ -689,25 +681,16 @@ export default function RegisterPage() {
           )}
 
           {resultUrl && (
-            <div id="qr-result" className="mt-7 rounded-2xl border border-[#eee8dc] bg-[#fffdf8] p-5 text-center">
-              <p className="text-xs font-bold text-[#8b8378]">생성된 meonggrey 링크</p>
-              <p className="mt-2 break-all text-sm text-[#4f493f]">{resultUrl}</p>
-
-              <Image
-                src={qrImage}
-                alt="생성된 반려견 QR 코드"
-                width={160}
-                height={160}
-                unoptimized
-                className="mx-auto mt-4 rounded-xl bg-white p-2 shadow-sm"
-              />
-
+            <div id="register-result" className="mt-7 rounded-2xl border border-[#eee8dc] bg-[#fffdf8] p-5">
+              <p className="text-sm font-black text-[#24963a]">등록이 완료됐어요</p>
+              <p className="mt-2 text-xs leading-5 text-[#8b8378]">
+                관리자가 미리 만든 QR 코드는 이미 준비되어 있고, 지금은 반려견 정보만 저장되었습니다.
+              </p>
               <a
-                href={qrImage}
-                download={`pet-${form.phone}.png`}
-                className="mt-4 block rounded-xl bg-[#171717] p-3 text-sm font-bold text-white"
+                href={resultUrl}
+                className="mt-4 block break-all rounded-xl bg-white px-4 py-3 text-sm font-bold text-[#2f9d46] underline underline-offset-4"
               >
-                QR 다운로드
+                {resultUrl}
               </a>
             </div>
           )}

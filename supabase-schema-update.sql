@@ -1,6 +1,7 @@
 create table if not exists registration_codes (
   code text primary key,
   pet_id text unique,
+  qr_image_url text,
   created_at timestamptz not null default now(),
   used_at timestamptz
 );
@@ -24,8 +25,9 @@ on pets (registration_code);
 create index if not exists pets_user_id_idx
 on pets (user_id);
 
--- 등록코드는 관리자가 고객에게 전달하기 전에 미리 생성해둡니다.
+-- 등록코드는 관리자가 먼저 생성하고,
+-- QR 이미지까지 함께 만들어서 고객에게 전달합니다.
 -- 예시:
--- insert into registration_codes (code)
--- values ('PET-ABCD-1234')
+-- insert into registration_codes (code, pet_id, qr_image_url)
+-- values ('PET-ABCD-1234', 'nanoid-id-here', 'https://...')
 -- on conflict (code) do nothing;
