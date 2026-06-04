@@ -60,7 +60,7 @@ export default function RegisterPage() {
   // form 전체를 다루기 쉽고, 제출 시에도 그대로 FormData로 옮기기 편합니다.
   const [form, setForm] = useState({
     // registration_code:
-    // 판매자/관리자가 미리 발급해준 등록코드입니다.
+    // 판매자/관리자가 미리 발급해준 승인코드입니다.
     // 등록 전에 유효한 코드인지 서버에서 먼저 검사합니다.
     registration_code: '',
 
@@ -223,10 +223,10 @@ export default function RegisterPage() {
       const registrationCode = form.registration_code.trim().toUpperCase();
 
       // 1. 프론트에서 먼저 아주 기본적인 빈칸/길이 검사를 합니다.
-      // 2. 그 다음 서버에 등록코드 검증 요청을 보냅니다.
+      // 2. 그 다음 서버에 승인코드 검증 요청을 보냅니다.
       // 3. 마지막으로 실제 등록 API에 FormData를 전송합니다.
       if (!registrationCode || !form.user_id || !form.password) {
-        alert('등록코드, 고객 ID, 비밀번호를 입력해주세요.');
+        alert('승인코드, 고객 ID, 비밀번호를 입력해주세요.');
         return;
       }
 
@@ -253,9 +253,9 @@ export default function RegisterPage() {
       const codeValidationData = await readJsonResponse(codeValidationRes);
 
       if (!codeValidationRes.ok) {
-        // 등록코드는 "존재하지 않음" 또는 "이미 사용됨"일 수 있습니다.
+        // 승인코드는 "존재하지 않음" 또는 "이미 사용됨"일 수 있습니다.
         // 이 에러 메시지는 서버가 상황에 맞게 만들어서 보내줍니다.
-        const errorMessage = codeValidationData?.error || '등록코드를 확인할 수 없습니다.';
+        const errorMessage = codeValidationData?.error || '승인코드를 확인할 수 없습니다.';
         setSubmitMessage(errorMessage);
         alert(errorMessage);
         return;
@@ -389,7 +389,7 @@ export default function RegisterPage() {
 
               <div className="space-y-4">
                 <label className="block">
-                  <span className="mb-2 block text-sm font-bold">등록코드 <span className="text-[#ee6958]">*</span></span>
+                  <span className="mb-2 block text-sm font-bold">승인코드 <span className="text-[#ee6958]">*</span></span>
                   <input
                     placeholder="예) PET-ABCD1234"
                     className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm uppercase outline-none transition placeholder:normal-case placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"

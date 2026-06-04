@@ -44,11 +44,11 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<'codes' | 'password' | 'qr'>('codes');
 
   // customCode:
-  // 등록코드 생성 탭에서 사용자가 직접 입력하는 코드
+  // 승인코드 생성 탭에서 사용자가 직접 입력하는 코드
   const [customCode, setCustomCode] = useState('');
 
   // resetCode:
-  // 임시 비밀번호 발급 대상 등록코드
+  // 임시 비밀번호 발급 대상 승인코드
   const [resetCode, setResetCode] = useState('');
 
   // temporaryPassword:
@@ -64,7 +64,7 @@ export default function AdminPage() {
   const [pets, setPets] = useState<PetQr[]>([]);
 
   // createdCodes:
-  // 등록코드 생성 탭에서 새로 만든 코드 목록
+  // 승인코드 생성 탭에서 새로 만든 코드 목록
   const [createdCodes, setCreatedCodes] = useState<CreatedCode[]>([]);
 
   // searched:
@@ -117,14 +117,14 @@ export default function AdminPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || '등록코드 생성에 실패했어요.');
+        setError(data.error || '승인코드 생성에 실패했어요.');
         return;
       }
 
       setCreatedCodes((prev) => [data, ...prev]);
       setCustomCode('');
     } catch {
-      setError('등록코드 생성 중 오류가 발생했어요.');
+      setError('승인코드 생성 중 오류가 발생했어요.');
     } finally {
       setLoading(false);
     }
@@ -225,7 +225,7 @@ export default function AdminPage() {
             관리자 페이지
           </h1>
           <p className="mt-4 text-sm leading-6 text-[#6f6657]">
-            등록코드와 QR 생성, 임시 비밀번호 발급, QR 조회를 한 곳에서 관리합니다.
+            승인코드와 QR 생성, 임시 비밀번호 발급, QR 조회를 한 곳에서 관리합니다.
           </p>
         </header>
 
@@ -254,7 +254,7 @@ export default function AdminPage() {
           <div>
             <div className="mb-6 grid grid-cols-3 gap-2 rounded-2xl bg-[#f7f3ec] p-1">
               {[
-                ['codes', '등록코드'],
+                ['codes', '승인코드'],
                 ['password', '비밀번호'],
                 ['qr', 'QR 조회'],
               ].map(([id, label]) => (
@@ -279,7 +279,7 @@ export default function AdminPage() {
               <div className="space-y-5">
                 <form onSubmit={handleCreateCode} className="space-y-4">
                   <label className="block">
-                    <span className="mb-2 block text-sm font-bold">직접 입력할 등록코드 <span className="font-medium text-[#8b8378]">(선택)</span></span>
+                    <span className="mb-2 block text-sm font-bold">직접 입력할 승인코드 <span className="font-medium text-[#8b8378]">(선택)</span></span>
                     <input
                       placeholder="비워두면 자동 생성됩니다"
                       className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm uppercase outline-none transition placeholder:normal-case placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
@@ -292,7 +292,7 @@ export default function AdminPage() {
                     disabled={loading}
                     className="h-13 w-full rounded-xl bg-[#ffd766] px-5 text-sm font-black text-[#211a0c] shadow-[0_10px_24px_rgba(229,173,36,0.28)] transition hover:bg-[#ffcc3d] disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {loading ? '생성 중...' : '등록코드와 QR 생성하기'}
+                    {loading ? '생성 중...' : '승인코드와 QR 생성하기'}
                   </button>
                 </form>
 
@@ -354,12 +354,12 @@ export default function AdminPage() {
                   <div>
                     <p className="text-sm font-black">임시 비밀번호 재설정</p>
                     <p className="mt-2 text-xs leading-5 text-[#8b8378]">
-                      고객이 비밀번호를 잊은 경우 등록코드로 임시 비밀번호를 발급합니다.
+                      고객이 비밀번호를 잊은 경우 승인코드로 임시 비밀번호를 발급합니다.
                     </p>
                   </div>
 
                   <label className="block">
-                    <span className="mb-2 block text-sm font-bold">등록코드</span>
+                    <span className="mb-2 block text-sm font-bold">승인코드</span>
                     <input
                       placeholder="예) PET-ABCD1234"
                       className="h-12 w-full rounded-xl border border-[#e7e2da] bg-white px-4 text-sm uppercase outline-none transition placeholder:normal-case placeholder:text-[#b8b2aa] focus:border-[#f2bd33] focus:ring-4 focus:ring-[#ffe8a3]"
